@@ -27,6 +27,12 @@ export const dynamic =
 
 export const revalidate = 0;
 
+/*
+=========================================
+기준월 시작일 / 다음달 시작일
+=========================================
+*/
+
 function getMonthRange(
   month: string
 ) {
@@ -51,8 +57,7 @@ function getMonthRange(
 
   const next =
     `${nextDate.getUTCFullYear()}-${String(
-      nextDate.getUTCMonth() +
-        1
+      nextDate.getUTCMonth() + 1
     ).padStart(
       2,
       "0"
@@ -63,6 +68,13 @@ function getMonthRange(
     next,
   };
 }
+
+/*
+=========================================
+GET
+일별 대시보드 데이터
+=========================================
+*/
 
 export async function GET(
   request: NextRequest
@@ -94,6 +106,25 @@ export async function GET(
         month
       );
 
+    /*
+    =========================================
+    데이터 조회
+
+    platformRows에서 플랫폼 설정까지
+    함께 가져온다.
+
+    includeInTotal
+      → KPI 합계 포함 여부
+
+    includeInChannelChart
+      → 채널 목록/차트 표시 여부
+
+    isActive
+      → 현재 활성 상태
+      ※ 과거 데이터 자체는 삭제/제외하지 않음
+    =========================================
+    */
+
     const [
       platformRows,
       callRows,
@@ -106,6 +137,9 @@ export async function GET(
           date:
             dailyPlatformStats.date,
 
+          platformId:
+            platforms.id,
+
           platform:
             platforms.name,
 
@@ -117,6 +151,15 @@ export async function GET(
 
           sortOrder:
             platforms.sortOrder,
+
+          isActive:
+            platforms.isActive,
+
+          includeInTotal:
+            platforms.includeInTotal,
+
+          includeInChannelChart:
+            platforms.includeInChannelChart,
         })
         .from(
           dailyPlatformStats
@@ -146,8 +189,17 @@ export async function GET(
           ),
           asc(
             platforms.sortOrder
+          ),
+          asc(
+            platforms.id
           )
         ),
+
+      /*
+      =========================================
+      전날콜 / 7콜
+      =========================================
+      */
 
       db
         .select()
@@ -172,6 +224,12 @@ export async function GET(
           )
         ),
 
+      /*
+      =========================================
+      내원경로
+      =========================================
+      */
+
       db
         .select()
         .from(
@@ -194,6 +252,12 @@ export async function GET(
             dailyVisitSources.date
           )
         ),
+
+      /*
+      =========================================
+      총인콜
+      =========================================
+      */
 
       db
         .select()
@@ -218,6 +282,15 @@ export async function GET(
           )
         ),
 
+      /*
+      =========================================
+      당일취소
+
+      일반 대시보드에서는
+      개인정보 없이 건수만 조회
+      =========================================
+      */
+
       db
         .select({
           date:
@@ -239,6 +312,12 @@ export async function GET(
           )
         ),
     ]);
+
+    /*
+    =========================================
+    데이터가 존재하는 날짜 생성
+    =========================================
+    */
 
     const dates =
       Array.from(
@@ -262,12 +341,30 @@ export async function GET(
             (row) =>
               row.date
           ),
+
+          ...cancellationRows.map(
+            (row) =>
+              row.date
+          ),
         ])
       ).sort();
+
+    /*
+    =========================================
+    날짜별 데이터 조립
+    =========================================
+    */
 
     const days =
       dates.map(
         (date) => {
+          /*
+          해당 날짜 플랫폼 전체
+
+          비활성 플랫폼이라도
+          과거 데이터가 존재하면 여기에는 남는다.
+          */
+
           const dayPlatforms =
             platformRows.filter(
               (row) =>
@@ -275,21 +372,67 @@ export async function GET(
                 date
             );
 
+          /*
+          =====================================
+          KPI 합계 대상
+
+          includeInTotal=true만 합산
+          =====================================
+          */
+
+          const totalPlatforms =
+            dayPlatforms.filter(
+              (row) =>
+                row.includeInTotal
+            );
+
+          /*
+          =====================================
+          채널 목록/차트 대상
+
+          includeInChannelChart=true만 노출
+          =====================================
+          */
+
+          const chartPlatforms =
+            dayPlatforms.filter(
+              (row) =>
+                row.includeInChannelChart
+            );
+
+          /*
+          =====================================
+          신청 합계
+          =====================================
+          */
+
           const applications =
-            dayPlatforms.reduce(
+            totalPlatforms.reduce(
               (sum, row) =>
                 sum +
                 row.applications,
               0
             );
 
+          /*
+          =====================================
+          예약 합계
+          =====================================
+          */
+
           const reservations =
-            dayPlatforms.reduce(
+            totalPlatforms.reduce(
               (sum, row) =>
                 sum +
                 row.reservations,
               0
             );
+
+          /*
+          =====================================
+          콜 데이터
+          =====================================
+          */
 
           const call =
             callRows.find(
@@ -298,12 +441,24 @@ export async function GET(
                 date
             );
 
+          /*
+          =====================================
+          인콜 데이터
+          =====================================
+          */
+
           const incall =
             incallRows.find(
               (row) =>
                 row.date ===
                 date
             );
+
+          /*
+          =====================================
+          내원경로
+          =====================================
+          */
 
           const visitSources =
             visitRows
@@ -322,6 +477,12 @@ export async function GET(
                 })
               );
 
+          /*
+          =====================================
+          당일취소 건수
+          =====================================
+          */
+
           const cancellationCount =
             cancellationRows.filter(
               (row) =>
@@ -329,24 +490,42 @@ export async function GET(
                 date
             ).length;
 
+          /*
+          =====================================
+          날짜 데이터 반환
+          =====================================
+          */
+
           return {
             date,
+
+            /*
+            KPI
+            */
 
             applications,
 
             reservations,
 
             rate:
-              applications >
-              0
+              applications > 0
                 ? (reservations /
                     applications) *
                   100
                 : 0,
 
+            /*
+            채널별 실적
+
+            includeInChannelChart=true만 반환
+            */
+
             platforms:
-              dayPlatforms.map(
+              chartPlatforms.map(
                 (row) => ({
+                  id:
+                    row.platformId,
+
                   name:
                     row.platform,
 
@@ -363,8 +542,21 @@ export async function GET(
                           row.applications) *
                         100
                       : 0,
+
+                  isActive:
+                    row.isActive,
+
+                  includeInTotal:
+                    row.includeInTotal,
+
+                  includeInChannelChart:
+                    row.includeInChannelChart,
                 })
               ),
+
+            /*
+            전날콜
+            */
 
             previousCall: {
               total:
@@ -376,6 +568,10 @@ export async function GET(
                 {},
             },
 
+            /*
+            7콜
+            */
+
             sevenCall: {
               total:
                 call?.sevenTotal ??
@@ -386,7 +582,15 @@ export async function GET(
                 {},
             },
 
+            /*
+            내원경로
+            */
+
             visitSources,
+
+            /*
+            인콜
+            */
 
             incall: {
               total:
@@ -410,10 +614,24 @@ export async function GET(
                 0,
             },
 
+            /*
+            당일취소
+            */
+
             cancellationCount,
           };
         }
       );
+
+    /*
+    =========================================
+    월 누적 KPI
+
+    각 날짜에서 이미
+    includeInTotal=true만 계산됐으므로
+    그대로 합산하면 된다.
+    =========================================
+    */
 
     const totalApplications =
       days.reduce(
@@ -455,6 +673,12 @@ export async function GET(
         0
       );
 
+    /*
+    =========================================
+    응답
+    =========================================
+    */
+
     return NextResponse.json({
       ok: true,
 
@@ -485,6 +709,10 @@ export async function GET(
           cancellations:
             totalCancellations,
         },
+
+        /*
+        최근 날짜가 위로 오도록 역순
+        */
 
         days:
           [...days].reverse(),

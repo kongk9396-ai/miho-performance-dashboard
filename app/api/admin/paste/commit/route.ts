@@ -8,6 +8,7 @@ import {
   eq,
   gte,
   lt,
+  sql,
 } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -23,21 +24,28 @@ import {
   platforms,
 } from "@/lib/db/schema";
 
-export const dynamic =
-  "force-dynamic";
+import {
+  isAdminAuthenticated,
+} from "@/lib/auth/admin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type PlatformRow = {
   platform: string;
   applications: number;
   reservations: number;
+  raw?: string;
 };
 
 type CallStats = {
   total: number;
+
   details: Record<
     string,
     number
   >;
+
   raw: string;
 };
 
@@ -62,7 +70,6 @@ type SaveDay = {
   platforms: PlatformRow[];
 
   previousCall: CallStats;
-
   sevenCall: CallStats;
 
   visitSources: VisitSource[];
@@ -72,225 +79,268 @@ type SaveDay = {
   cancellations: string[];
 };
 
+type SaveBody = {
+  days: SaveDay[];
+};
+
 function normalize(
   value: string
 ) {
   return value
     .trim()
-    .replace(/\s+/g, "");
+    .replace(/\s+/g, "")
+    .toLowerCase();
 }
 
-function getMonthRange(
-  dateValue: string
+function safeNumber(
+  value: unknown
 ) {
-  const [year, month] =
-    dateValue
+  return Math.max(
+    0,
+    Math.round(
+      Number(value) || 0
+    )
+  );
+}
+
+function isValidDate(
+  value: string
+) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(
+    value
+  );
+}
+
+function getMonthStart(
+  date: string
+) {
+  return `${date.slice(
+    0,
+    7
+  )}-01`;
+}
+
+function getNextMonth(
+  month: string
+) {
+  const [year, monthNumber] =
+    month
       .split("-")
       .map(Number);
 
-  const start =
-    `${year}-${String(
-      month
-    ).padStart(2, "0")}-01`;
-
-  const nextDate =
+  const date =
     new Date(
-      Date.UTC(
-        year,
-        month,
-        1
-      )
+      year,
+      monthNumber,
+      1
     );
 
-  const next =
-    `${nextDate.getUTCFullYear()}-${String(
-      nextDate.getUTCMonth() +
-        1
-    ).padStart(
-      2,
-      "0"
-    )}-01`;
-
-  return {
-    start,
-    next,
-  };
+  return `${date.getFullYear()}-${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}-01`;
 }
 
 /*
-  ★ 핵심
-
-  해당 월 daily_platform_stats를
-  다시 처음부터 SUM해서
-
-  monthly_platform_stats_v2를
-  갱신한다.
-
-  단순 + 누적 방식이 아니므로
-  같은 날짜를 수정해도 합계가
-  꼬이지 않는다.
+  플랫폼 이름이 플랫폼 마스터에 없으면
+  자동으로 생성
 */
+async function getOrCreatePlatform(
+  platformName: string
+) {
+  const cleanName =
+    platformName.trim();
 
+  const normalized =
+    normalize(cleanName);
+
+  const existingPlatforms =
+    await db
+      .select()
+      .from(platforms);
+
+  const existing =
+    existingPlatforms.find(
+      (row) =>
+        normalize(row.name) ===
+        normalized
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  const [created] =
+    await db
+      .insert(platforms)
+      .values({
+        name: cleanName,
+
+        sortOrder:
+          existingPlatforms.length +
+          1,
+
+        isActive: true,
+
+        includeInTotal: true,
+
+        includeInChannelChart:
+          normalized !==
+          "총인콜",
+      })
+      .returning();
+
+  return created;
+}
+
+/*
+  해당 월의 일별 플랫폼 데이터를 전부 합산해서
+  월별 플랫폼 데이터를 다시 생성
+
+  즉:
+  8/1 + 8/3 + 8/4 ...
+  ↓
+  2026-08 월간 보기 자동 갱신
+*/
 async function rebuildMonthlyPlatformStats(
   month: string
 ) {
-  const {
-    start,
-    next,
-  } = getMonthRange(
-    month
-  );
-
-  const [
-    dailyRows,
-    platformRows,
-  ] =
-    await Promise.all([
-      db
-        .select({
-          platformId:
-            dailyPlatformStats.platformId,
-
-          applications:
-            dailyPlatformStats.applications,
-
-          reservations:
-            dailyPlatformStats.reservations,
-        })
-        .from(
-          dailyPlatformStats
-        )
-        .where(
-          and(
-            gte(
-              dailyPlatformStats.date,
-              start
-            ),
-            lt(
-              dailyPlatformStats.date,
-              next
-            )
-          )
-        ),
-
-      db
-        .select()
-        .from(
-          platforms
-        ),
-    ]);
+  const nextMonth =
+    getNextMonth(month);
 
   const totals =
-    new Map<
-      number,
-      {
-        applications: number;
-        reservations: number;
-      }
-    >();
+    await db
+      .select({
+        platformId:
+          dailyPlatformStats.platformId,
 
-  for (const row of dailyRows) {
-    const existing =
-      totals.get(
-        row.platformId
-      ) ?? {
-        applications: 0,
-        reservations: 0,
-      };
+        applications:
+          sql<number>`
+            coalesce(
+              sum(
+                ${dailyPlatformStats.applications}
+              ),
+              0
+            )
+          `,
 
-    existing.applications +=
-      row.applications;
+        reservations:
+          sql<number>`
+            coalesce(
+              sum(
+                ${dailyPlatformStats.reservations}
+              ),
+              0
+            )
+          `,
+      })
+      .from(
+        dailyPlatformStats
+      )
+      .where(
+        and(
+          gte(
+            dailyPlatformStats.date,
+            month
+          ),
 
-    existing.reservations +=
-      row.reservations;
-
-    totals.set(
-      row.platformId,
-      existing
-    );
-  }
-
-  /*
-    일별 데이터가 존재하는 플랫폼만
-    월간 값을 갱신.
-
-    과거 월간 데이터가 있는데
-    일부 일자만 붙여넣었다고 해서
-    다른 플랫폼 월 데이터까지
-    0으로 날리지 않도록 함.
-  */
-
-  for (
-    const [
-      platformId,
-      values,
-    ] of totals
-  ) {
-    const platformExists =
-      platformRows.some(
-        (row) =>
-          row.id ===
-          platformId
+          lt(
+            dailyPlatformStats.date,
+            nextMonth
+          )
+        )
+      )
+      .groupBy(
+        dailyPlatformStats.platformId
       );
 
-    if (!platformExists) {
-      continue;
-    }
+  /*
+    기존 월별 데이터 삭제
+  */
+  await db
+    .delete(
+      monthlyPlatformStats
+    )
+    .where(
+      eq(
+        monthlyPlatformStats.month,
+        month
+      )
+    );
 
+  /*
+    일별 합산 결과를
+    월별 데이터로 다시 저장
+  */
+  if (
+    totals.length > 0
+  ) {
     await db
       .insert(
         monthlyPlatformStats
       )
-      .values({
-        month: start,
+      .values(
+        totals.map(
+          (row) => ({
+            month,
 
-        platformId,
+            platformId:
+              row.platformId,
 
-        applications:
-          values.applications,
+            applications:
+              safeNumber(
+                row.applications
+              ),
 
-        reservations:
-          values.reservations,
-      })
-      .onConflictDoUpdate({
-        target: [
-          monthlyPlatformStats.month,
-          monthlyPlatformStats.platformId,
-        ],
-
-        set: {
-          applications:
-            values.applications,
-
-          reservations:
-            values.reservations,
-
-          updatedAt:
-            new Date(),
-        },
-      });
+            reservations:
+              safeNumber(
+                row.reservations
+              ),
+          })
+        )
+      );
   }
 }
 
 export async function POST(
   request: NextRequest
 ) {
+  /*
+    관리자 로그인 확인
+  */
+  if (
+    !(await isAdminAuthenticated())
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+
+        message:
+          "관리자 로그인이 필요합니다.",
+      },
+      {
+        status: 401,
+      }
+    );
+  }
+
   try {
     const body =
-      await request.json();
+      (await request.json()) as SaveBody;
 
     const days =
-      body.days as SaveDay[];
+      Array.isArray(body.days)
+        ? body.days
+        : [];
 
     if (
-      !Array.isArray(days) ||
       days.length === 0
     ) {
       return NextResponse.json(
         {
           ok: false,
+
           message:
-            "저장할 데이터가 없습니다.",
+            "저장할 일별 데이터가 없습니다.",
         },
         {
           status: 400,
@@ -298,51 +348,44 @@ export async function POST(
       );
     }
 
+    let reportSaved = 0;
+    let platformSaved = 0;
+    let callSaved = 0;
+    let visitSaved = 0;
+    let incallSaved = 0;
+    let cancellationSaved = 0;
+
     /*
-      플랫폼 마스터
+      이번 저장에서 수정된 월 목록
     */
-
-    const masterPlatforms =
-      await db
-        .select()
-        .from(
-          platforms
-        );
-
-    const platformMap =
-      new Map(
-        masterPlatforms.map(
-          (row) => [
-            normalize(
-              row.name
-            ),
-            row,
-          ]
-        )
-      );
-
     const touchedMonths =
       new Set<string>();
 
-    let platformSaved =
-      0;
+    for (
+      const day of days
+    ) {
+      if (
+        !day.date ||
+        !isValidDate(
+          day.date
+        )
+      ) {
+        continue;
+      }
 
-    let reportSaved = 0;
+      const month =
+        getMonthStart(
+          day.date
+        );
 
-    /*
-      날짜별 저장
-    */
-
-    for (const day of days) {
       touchedMonths.add(
-        `${day.date.slice(
-          0,
-          7
-        )}-01`
+        month
       );
 
       /*
-        ① 보고 원문
+        ==============================
+        1. 원본 텔레그램 보고 저장
+        ==============================
       */
 
       await db
@@ -354,8 +397,7 @@ export async function POST(
             day.date,
 
           rawText:
-            day.rawText ??
-            "",
+            day.rawText ?? "",
         })
         .onConflictDoUpdate({
           target:
@@ -363,8 +405,7 @@ export async function POST(
 
           set: {
             rawText:
-              day.rawText ??
-              "",
+              day.rawText ?? "",
 
             updatedAt:
               new Date(),
@@ -374,55 +415,40 @@ export async function POST(
       reportSaved++;
 
       /*
-        ② 플랫폼 DB 실적
+        ==============================
+        2. 일별 플랫폼 실적
+        ==============================
+
+        같은 날짜를 다시 입력하면
+        기존 날짜 데이터를 삭제하고
+        새 보고 내용으로 교체
       */
 
-      for (const row of day.platforms) {
-        const normalized =
-          normalize(
+      await db
+        .delete(
+          dailyPlatformStats
+        )
+        .where(
+          eq(
+            dailyPlatformStats.date,
+            day.date
+          )
+        );
+
+      for (
+        const row of
+        day.platforms ?? []
+      ) {
+        if (
+          !row.platform?.trim()
+        ) {
+          continue;
+        }
+
+        const platform =
+          await getOrCreatePlatform(
             row.platform
           );
-
-        let platform =
-          platformMap.get(
-            normalized
-          );
-
-        if (!platform) {
-          const [
-            created,
-          ] =
-            await db
-              .insert(
-                platforms
-              )
-              .values({
-                name:
-                  row.platform,
-
-                sortOrder:
-                  platformMap.size +
-                  1,
-
-                isActive:
-                  true,
-
-                includeInTotal:
-                  true,
-
-                includeInChannelChart:
-                  true,
-              })
-              .returning();
-
-          platform =
-            created;
-
-          platformMap.set(
-            normalized,
-            created
-          );
-        }
 
         await db
           .insert(
@@ -436,59 +462,48 @@ export async function POST(
               platform.id,
 
             applications:
-              Math.max(
-                0,
-                Math.round(
-                  row.applications ??
-                    0
-                )
+              safeNumber(
+                row.applications
               ),
 
             reservations:
-              Math.max(
-                0,
-                Math.round(
-                  row.reservations ??
-                    0
-                )
+              safeNumber(
+                row.reservations
               ),
-          })
-          .onConflictDoUpdate({
-            target: [
-              dailyPlatformStats.date,
-              dailyPlatformStats.platformId,
-            ],
-
-            set: {
-              applications:
-                Math.max(
-                  0,
-                  Math.round(
-                    row.applications ??
-                      0
-                  )
-                ),
-
-              reservations:
-                Math.max(
-                  0,
-                  Math.round(
-                    row.reservations ??
-                      0
-                  )
-                ),
-
-              updatedAt:
-                new Date(),
-            },
           });
 
         platformSaved++;
       }
 
       /*
-        ③ 전날콜 + 7콜
+        ==============================
+        3. 전날콜 / 7콜
+        ==============================
+
+        daily_call_stats 실제 스키마:
+
+        previousTotal
+        previousDetails
+        sevenTotal
+        sevenDetails
+
+        raw 값은 dailyReports.rawText에
+        이미 전체 저장되므로 별도 저장하지 않음
       */
+
+      const previousCall =
+        day.previousCall ?? {
+          total: 0,
+          details: {},
+          raw: "",
+        };
+
+      const sevenCall =
+        day.sevenCall ?? {
+          total: 0,
+          details: {},
+          raw: "",
+        };
 
       await db
         .insert(
@@ -499,23 +514,21 @@ export async function POST(
             day.date,
 
           previousTotal:
-            day.previousCall
-              ?.total ??
-            0,
+            safeNumber(
+              previousCall.total
+            ),
 
           previousDetails:
-            day.previousCall
-              ?.details ??
+            previousCall.details ??
             {},
 
           sevenTotal:
-            day.sevenCall
-              ?.total ??
-            0,
+            safeNumber(
+              sevenCall.total
+            ),
 
           sevenDetails:
-            day.sevenCall
-              ?.details ??
+            sevenCall.details ??
             {},
         })
         .onConflictDoUpdate({
@@ -524,23 +537,21 @@ export async function POST(
 
           set: {
             previousTotal:
-              day.previousCall
-                ?.total ??
-              0,
+              safeNumber(
+                previousCall.total
+              ),
 
             previousDetails:
-              day.previousCall
-                ?.details ??
+              previousCall.details ??
               {},
 
             sevenTotal:
-              day.sevenCall
-                ?.total ??
-              0,
+              safeNumber(
+                sevenCall.total
+              ),
 
             sevenDetails:
-              day.sevenCall
-                ?.details ??
+              sevenCall.details ??
               {},
 
             updatedAt:
@@ -548,12 +559,12 @@ export async function POST(
           },
         });
 
-      /*
-        ④ 내원경로
+      callSaved++;
 
-        같은 날짜를 재저장하면
-        기존 내원경로 삭제 후
-        다시 넣는다.
+      /*
+        ==============================
+        4. 내원경로
+        ==============================
       */
 
       await db
@@ -567,39 +578,50 @@ export async function POST(
           )
         );
 
-      if (
-        day.visitSources
-          ?.length
+      for (
+        const source of
+        day.visitSources ?? []
       ) {
+        if (
+          !source.source?.trim()
+        ) {
+          continue;
+        }
+
         await db
           .insert(
             dailyVisitSources
           )
-          .values(
-            day.visitSources.map(
-              (row) => ({
-                date:
-                  day.date,
+          .values({
+            date:
+              day.date,
 
-                source:
-                  row.source,
+            source:
+              source.source.trim(),
 
-                count:
-                  Math.max(
-                    0,
-                    Math.round(
-                      row.count ??
-                        0
-                    )
-                  ),
-              })
-            )
-          );
+            count:
+              safeNumber(
+                source.count
+              ),
+          });
+
+        visitSaved++;
       }
 
       /*
-        ⑤ 총인콜
+        ==============================
+        5. 총인콜
+        ==============================
       */
+
+      const incall =
+        day.incall ?? {
+          total: 0,
+          newCount: 0,
+          simpleCount: 0,
+          changedCount: 0,
+          canceledCount: 0,
+        };
 
       await db
         .insert(
@@ -610,29 +632,29 @@ export async function POST(
             day.date,
 
           total:
-            day.incall
-              ?.total ??
-            0,
+            safeNumber(
+              incall.total
+            ),
 
           newCount:
-            day.incall
-              ?.newCount ??
-            0,
+            safeNumber(
+              incall.newCount
+            ),
 
           simpleCount:
-            day.incall
-              ?.simpleCount ??
-            0,
+            safeNumber(
+              incall.simpleCount
+            ),
 
           changedCount:
-            day.incall
-              ?.changedCount ??
-            0,
+            safeNumber(
+              incall.changedCount
+            ),
 
           canceledCount:
-            day.incall
-              ?.canceledCount ??
-            0,
+            safeNumber(
+              incall.canceledCount
+            ),
         })
         .onConflictDoUpdate({
           target:
@@ -640,39 +662,41 @@ export async function POST(
 
           set: {
             total:
-              day.incall
-                ?.total ??
-              0,
+              safeNumber(
+                incall.total
+              ),
 
             newCount:
-              day.incall
-                ?.newCount ??
-              0,
+              safeNumber(
+                incall.newCount
+              ),
 
             simpleCount:
-              day.incall
-                ?.simpleCount ??
-              0,
+              safeNumber(
+                incall.simpleCount
+              ),
 
             changedCount:
-              day.incall
-                ?.changedCount ??
-              0,
+              safeNumber(
+                incall.changedCount
+              ),
 
             canceledCount:
-              day.incall
-                ?.canceledCount ??
-              0,
+              safeNumber(
+                incall.canceledCount
+              ),
 
             updatedAt:
               new Date(),
           },
         });
 
-      /*
-        ⑥ 당일취소
+      incallSaved++;
 
-        재저장 시 중복 방지
+      /*
+        ==============================
+        6. 당일 취소
+        ==============================
       */
 
       await db
@@ -686,31 +710,37 @@ export async function POST(
           )
         );
 
-      if (
-        day.cancellations
-          ?.length
+      for (
+        const patientText of
+        day.cancellations ?? []
       ) {
+        const text =
+          patientText.trim();
+
+        if (!text) {
+          continue;
+        }
+
         await db
           .insert(
             dailyCancellations
           )
-          .values(
-            day.cancellations.map(
-              (
-                patientText
-              ) => ({
-                date:
-                  day.date,
+          .values({
+            date:
+              day.date,
 
-                patientText,
-              })
-            )
-          );
+            patientText:
+              text,
+          });
+
+        cancellationSaved++;
       }
     }
 
     /*
-      ⑦ 월간 신청/예약 자동 재계산
+      ==============================
+      7. 월별 합계 자동 업데이트
+      ==============================
     */
 
     for (
@@ -726,17 +756,29 @@ export async function POST(
       ok: true,
 
       message:
-        `${reportSaved}일 저장 · ` +
-        `${platformSaved}개 플랫폼 실적 저장 · ` +
-        `${touchedMonths.size}개월 월간 합계 자동 갱신`,
+        `${reportSaved}일치 데이터를 저장했고 월간 합계도 갱신했습니다.`,
 
-      savedDays:
-        reportSaved,
+      saved: {
+        reports:
+          reportSaved,
 
-      savedPlatformRows:
-        platformSaved,
+        platforms:
+          platformSaved,
 
-      updatedMonths:
+        calls:
+          callSaved,
+
+        visitSources:
+          visitSaved,
+
+        incalls:
+          incallSaved,
+
+        cancellations:
+          cancellationSaved,
+      },
+
+      rebuiltMonths:
         Array.from(
           touchedMonths
         ),
@@ -750,8 +792,9 @@ export async function POST(
     return NextResponse.json(
       {
         ok: false,
+
         message:
-          "텔레그램 DB 저장 중 오류가 발생했습니다.",
+          "텔레그램 보고 저장 중 오류가 발생했습니다.",
       },
       {
         status: 500,

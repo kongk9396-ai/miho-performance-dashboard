@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import {
   ArrowDownRight,
   ArrowUpRight,
   CalendarDays,
   Loader2,
+  Settings,
   TrendingUp,
 } from "lucide-react";
 
@@ -1172,6 +1173,15 @@ export default function DashboardClient({
             </div>
           </div>
 
+          {/* 관리자 바로가기 */}
+          <a
+            href="/login"
+            className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <Settings size={17} />
+            관리자
+          </a>
+
           {/* 월 선택 */}
 
           <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
@@ -1451,3 +1461,5 @@ export default function DashboardClient({
     </main>
   );
 }
+
+

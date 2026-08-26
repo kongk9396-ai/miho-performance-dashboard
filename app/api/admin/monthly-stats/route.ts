@@ -4,7 +4,6 @@ import {
 } from "next/server";
 
 import {
-  and,
   eq,
 } from "drizzle-orm";
 
@@ -18,7 +17,12 @@ import {
   platforms,
 } from "@/lib/db/schema";
 
-export const dynamic = "force-dynamic";
+import {
+  isAdminAuthenticated,
+} from "@/lib/auth/admin";
+
+export const dynamic =
+  "force-dynamic";
 
 type PlatformInput = {
   platform: string;
@@ -58,14 +62,28 @@ function safeNumber(
   );
 }
 
-/* ========================================
-   GET
-   기존 월간 데이터 불러오기
-======================================== */
+async function requireAdmin() {
+  return await isAdminAuthenticated();
+}
 
 export async function GET(
   request: NextRequest
 ) {
+  if (
+    !(await requireAdmin())
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "관리자 로그인이 필요합니다.",
+      },
+      {
+        status: 401,
+      }
+    );
+  }
+
   try {
     const month =
       request.nextUrl.searchParams.get(
@@ -87,14 +105,6 @@ export async function GET(
         }
       );
     }
-
-    /*
-      플랫폼 실적
-
-      monthly_platform_stats_v2
-      +
-      platforms JOIN
-    */
 
     const platformRows =
       await db
@@ -131,10 +141,6 @@ export async function GET(
           )
         );
 
-    /*
-      상담 / 수술 총합
-    */
-
     const [conversion] =
       await db
         .select()
@@ -147,14 +153,6 @@ export async function GET(
             month
           )
         );
-
-    /*
-      실장별 실적
-
-      manager_performance_v2
-      +
-      managers JOIN
-    */
 
     const managerRows =
       await db
@@ -278,14 +276,24 @@ export async function GET(
   }
 }
 
-/* ========================================
-   POST
-   신규 저장 + 기존 월 수정
-======================================== */
-
 export async function POST(
   request: NextRequest
 ) {
+  if (
+    !(await requireAdmin())
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "관리자 로그인이 필요합니다.",
+      },
+      {
+        status: 401,
+      }
+    );
+  }
+
   try {
     const body =
       (await request.json()) as SaveBody;
@@ -311,10 +319,6 @@ export async function POST(
     const month =
       body.month;
 
-    /* =====================================
-       플랫폼 저장
-    ===================================== */
-
     for (
       const item of
       body.platforms ?? []
@@ -326,13 +330,7 @@ export async function POST(
         continue;
       }
 
-      /*
-        플랫폼 이름으로 ID 조회
-      */
-
-      const [
-        platformRow,
-      ] =
+      const [platformRow] =
         await db
           .select({
             id:
@@ -367,11 +365,6 @@ export async function POST(
           item.reservations
         );
 
-      /*
-        month + platformId
-        복합 unique 기준 UPSERT
-      */
-
       await db
         .insert(
           monthlyPlatformStats
@@ -395,16 +388,11 @@ export async function POST(
           set: {
             applications,
             reservations,
-
             updatedAt:
               new Date(),
           },
         });
     }
-
-    /* =====================================
-       전체 상담 / 수술 저장
-    ===================================== */
 
     const consultations =
       safeNumber(
@@ -432,17 +420,10 @@ export async function POST(
         set: {
           consultations,
           surgeries,
-
           updatedAt:
             new Date(),
         },
       });
-
-    /* =====================================
-       실장별 실적 저장
-
-       해당 월 데이터는 교체 방식
-    ===================================== */
 
     await db
       .delete(
@@ -474,13 +455,7 @@ export async function POST(
       const managerName =
         manager.managerName.trim();
 
-      /*
-        실장 이름으로 ID 조회
-      */
-
-      const [
-        managerRow,
-      ] =
+      const [managerRow] =
         await db
           .select({
             id:
