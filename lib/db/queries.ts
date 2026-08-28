@@ -11,6 +11,7 @@ import { db } from "./index";
 
 import {
   dailyPlatformStats,
+  dailyVisitSources,
   monthlyConversionStats,
   monthlyPlatformStats,
   platforms,
@@ -392,6 +393,7 @@ export async function getDashboardData(
     monthlyRows,
     rawDailyRows,
     conversionRows,
+    visitSourceRows,
   ] =
     await Promise.all([
       /* ============================
@@ -542,6 +544,20 @@ export async function getDashboardData(
         .orderBy(
           asc(
             monthlyConversionStats.month
+          )
+        ),
+
+      db
+        .select({
+          date: dailyVisitSources.date,
+          source: dailyVisitSources.source,
+          count: dailyVisitSources.count,
+        })
+        .from(dailyVisitSources)
+        .where(
+          and(
+            gte(dailyVisitSources.date, queryStartDate),
+            lt(dailyVisitSources.date, queryNextDate)
           )
         ),
     ]);
@@ -700,6 +716,42 @@ export async function getDashboardData(
       }
     );
 
+  const visitSourceMap =
+    new Map<string, number>();
+
+  visitSourceRows
+    .filter(
+      (row) =>
+        monthFromDate(row.date) ===
+        month
+    )
+    .forEach((row) => {
+      visitSourceMap.set(
+        row.source,
+        (visitSourceMap.get(row.source) ?? 0) +
+          row.count
+      );
+    });
+
+  const monthlyVisitSources =
+    Array.from(
+      visitSourceMap.entries()
+    )
+      .map(([source, count]) => ({
+        source,
+        count,
+      }))
+      .sort(
+        (a, b) =>
+          b.count - a.count
+      );
+
+  const totalVisitSourceCount =
+    monthlyVisitSources.reduce(
+      (sum, row) =>
+        sum + row.count,
+      0
+    );
   return {
     selectedMonth:
       month,
@@ -709,6 +761,9 @@ export async function getDashboardData(
     lastYear,
 
     monthlyTrend,
+
+    monthlyVisitSources,
+    totalVisitSourceCount,
   };
 }
 

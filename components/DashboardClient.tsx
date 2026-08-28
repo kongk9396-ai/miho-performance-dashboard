@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   ArrowDownRight,
@@ -45,6 +45,8 @@ type DashboardData = {
   previous: MonthData | null;
   lastYear: MonthData | null;
   monthlyTrend: TrendRow[];
+  monthlyVisitSources: { source: string; count: number }[];
+  totalVisitSourceCount: number;
 };
 
 function formatMonth(month: string) {
@@ -766,11 +768,23 @@ function TrendChart({
 }
 
 function PlatformChart({
-  data,
+  current,
+  previous,
+  lastYear,
 }: {
-  data: PlatformStat[];
+  current: PlatformStat[];
+  previous: PlatformStat[];
+  lastYear: PlatformStat[];
 }) {
-  if (data.length === 0) {
+  const platformNames = Array.from(
+    new Set([
+      ...current.map((item) => item.name),
+      ...previous.map((item) => item.name),
+      ...lastYear.map((item) => item.name),
+    ])
+  );
+
+  if (platformNames.length === 0) {
     return (
       <div className="mt-7 flex h-[250px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
         플랫폼 데이터가 없습니다.
@@ -778,49 +792,102 @@ function PlatformChart({
     );
   }
 
+  const getStat = (
+    rows: PlatformStat[],
+    name: string
+  ) =>
+    rows.find(
+      (item) => item.name === name
+    );
+
+  const periods = [
+    {
+      label: "이번 달",
+      rows: current,
+      barClass: "bg-blue-600",
+      textClass: "text-blue-700",
+    },
+    {
+      label: "전월",
+      rows: previous,
+      barClass: "bg-zinc-400",
+      textClass: "text-zinc-700",
+    },
+    {
+      label: "전년 동월",
+      rows: lastYear,
+      barClass: "bg-violet-300",
+      textClass: "text-violet-700",
+    },
+  ];
+
   return (
-    <div className="mt-7 space-y-5">
-      {data.map(
-        (item, index) => (
-          <div
-            key={item.name}
-            className="grid grid-cols-[105px_1fr_70px] items-center gap-3"
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-4 text-xs font-semibold text-zinc-400">
-                {index + 1}
-              </span>
+    <div className="mt-7 grid gap-5 md:grid-cols-2">
+      {platformNames.map((name) => (
+        <div
+          key={name}
+          className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-4"
+        >
+          <h3 className="mb-4 font-black text-zinc-900">
+            {name}
+          </h3>
 
-              <span className="text-sm font-semibold">
-                {item.name}
-              </span>
-            </div>
+          <div className="space-y-3">
+            {periods.map((period) => {
+              const stat =
+                getStat(
+                  period.rows,
+                  name
+                );
 
-            <div className="h-7 overflow-hidden rounded-md bg-blue-50">
-              <div
-                className="h-full rounded-md bg-blue-600"
-                style={{
-                  width: `${Math.min(
-                    item.rate,
-                    100
-                  )}%`,
-                }}
-              />
-            </div>
+              const rate =
+                stat?.rate ?? 0;
 
-            <span className="text-right text-sm font-bold text-blue-700">
-              {item.rate.toFixed(
-                2
-              )}
-              %
-            </span>
+              const hasData =
+                Boolean(stat);
+
+              return (
+                <div
+                  key={period.label}
+                  className="grid grid-cols-[64px_1fr_64px] items-center gap-3"
+                >
+                  <span className="text-xs font-semibold text-zinc-500">
+                    {period.label}
+                  </span>
+
+                  <div className="h-6 overflow-hidden rounded-md bg-zinc-100">
+                    {hasData && (
+                      <div
+                        className={`h-full rounded-md ${period.barClass}`}
+                        style={{
+                          width: `${Math.min(
+                            Math.max(
+                              rate,
+                              rate > 0 ? 1 : 0
+                            ),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <span
+                    className={`text-right text-xs font-black ${period.textClass}`}
+                  >
+                    {hasData
+                      ? `${rate.toFixed(2)}%`
+                      : "-"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        )
-      )}
+        </div>
+      ))}
     </div>
   );
 }
-
 export default function DashboardClient({
   data,
   availableMonths,
@@ -1272,6 +1339,54 @@ export default function DashboardClient({
         {viewMode ===
         "monthly" ? (
           <>
+            {/* 핵심 비교 / 전환율 */}
+
+            <section className="mb-6 grid gap-6 xl:grid-cols-2">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  핵심 실적 비교
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  이번 달 · 전월 · 전년 동월
+                </p>
+
+                <VolumeChart
+                  current={
+                    current
+                  }
+                  previous={
+                    previous
+                  }
+                  lastYear={
+                    lastYear
+                  }
+                />
+              </article>
+
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  전환율 비교
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  예약 전환율과 상담 → 수술 전환율
+                </p>
+
+                <ConversionChart
+                  current={
+                    current
+                  }
+                  previous={
+                    previous
+                  }
+                  lastYear={
+                    lastYear
+                  }
+                />
+              </article>
+            </section>
+
             {/* KPI */}
 
             <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1359,54 +1474,6 @@ export default function DashboardClient({
               )}
             </section>
 
-            {/* 핵심 비교 / 전환율 */}
-
-            <section className="mb-6 grid gap-6 xl:grid-cols-2">
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  핵심 실적 비교
-                </h2>
-
-                <p className="mt-1 text-sm text-zinc-500">
-                  이번 달 · 전월 · 전년 동월
-                </p>
-
-                <VolumeChart
-                  current={
-                    current
-                  }
-                  previous={
-                    previous
-                  }
-                  lastYear={
-                    lastYear
-                  }
-                />
-              </article>
-
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  전환율 비교
-                </h2>
-
-                <p className="mt-1 text-sm text-zinc-500">
-                  예약 전환율과 상담 → 수술 전환율
-                </p>
-
-                <ConversionChart
-                  current={
-                    current
-                  }
-                  previous={
-                    previous
-                  }
-                  lastYear={
-                    lastYear
-                  }
-                />
-              </article>
-            </section>
-
             {/* 월별 추이 / 플랫폼 */}
 
             <section className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
@@ -1427,21 +1494,92 @@ export default function DashboardClient({
               </article>
 
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold">
+                      월별 내원 경로
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 실제 내원 기준
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-400">
+                      총 내원
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-zinc-950">
+                      {dashboardData.totalVisitSourceCount.toLocaleString()}
+                      <span className="ml-1 text-sm font-semibold text-zinc-400">
+                        명
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {dashboardData.monthlyVisitSources.length > 0 ? (
+                    dashboardData.monthlyVisitSources.map((row) => {
+                      const rate =
+                        dashboardData.totalVisitSourceCount > 0
+                          ? (row.count /
+                              dashboardData.totalVisitSourceCount) *
+                            100
+                          : 0;
+
+                      return (
+                        <div key={row.source}>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                            <span className="font-semibold text-zinc-700">
+                              {row.source}
+                            </span>
+
+                            <span className="whitespace-nowrap text-zinc-500">
+                              <strong className="text-zinc-900">
+                                {row.count.toLocaleString()}명
+                              </strong>
+                              {" · "}
+                              {rate.toFixed(1)}%
+                            </span>
+                          </div>
+
+                          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className="h-full rounded-full bg-blue-600"
+                              style={{
+                                width: `${Math.max(
+                                  rate,
+                                  rate > 0 ? 2 : 0
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+                      등록된 내원 경로 데이터가 없습니다.
+                    </div>
+                  )}
+                </div>
+              </article>
+            </section>
+
+            <section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-bold">
-                  플랫폼별 예약 전환율
+                  플랫폼별 예약 전환율 비교
                 </h2>
 
                 <p className="mt-1 text-sm text-zinc-500">
-                  {formatMonth(
-                    dashboardData.selectedMonth
-                  )}{" "}
-                  기준
+                  이번 달 · 전월 · 전년 동월 기준
                 </p>
 
                 <PlatformChart
-                  data={
-                    current.platformStats
-                  }
+                  current={current.platformStats}
+                  previous={previous?.platformStats ?? []}
+                  lastYear={lastYear?.platformStats ?? []}
                 />
               </article>
             </section>
