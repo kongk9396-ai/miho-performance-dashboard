@@ -326,6 +326,46 @@ export const dailyConversionStats = pgTable(
    일일 보고 원문
 ======================================== */
 
+
+export const dailyCategoryConversionStats = pgTable(
+  "daily_category_conversion_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    category: text("category").notNull(),
+
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateCategoryUnique: uniqueIndex(
+      "daily_category_conversion_stats_date_category_uq"
+    ).on(
+      table.date,
+      table.category
+    ),
+  })
+);
 export const dailyReports = pgTable(
   "daily_reports",
   {

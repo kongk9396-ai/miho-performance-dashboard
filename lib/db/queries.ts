@@ -10,6 +10,8 @@ import {
 import { db } from "./index";
 
 import {
+  dailyCategoryConversionStats,
+  dailyConversionStats,
   dailyPlatformStats,
   dailyVisitSources,
   monthlyConversionStats,
@@ -393,6 +395,8 @@ export async function getDashboardData(
     monthlyRows,
     rawDailyRows,
     conversionRows,
+    dailyConversionRows,
+    categoryConversionRows,
     visitSourceRows,
   ] =
     await Promise.all([
@@ -547,6 +551,39 @@ export async function getDashboardData(
           )
         ),
 
+      db
+        .select({
+          date: dailyConversionStats.date,
+          consultations: dailyConversionStats.consultations,
+          surgeries: dailyConversionStats.surgeries,
+        })
+        .from(dailyConversionStats)
+        .where(
+          and(
+            gte(dailyConversionStats.date, queryStartDate),
+            lt(dailyConversionStats.date, queryNextDate)
+          )
+        )
+        .orderBy(
+          asc(dailyConversionStats.date)
+        ),
+      db
+        .select({
+          date: dailyCategoryConversionStats.date,
+          category: dailyCategoryConversionStats.category,
+          consultations: dailyCategoryConversionStats.consultations,
+          surgeries: dailyCategoryConversionStats.surgeries,
+        })
+        .from(dailyCategoryConversionStats)
+        .where(
+          and(
+            gte(dailyCategoryConversionStats.date, queryStartDate),
+            lt(dailyCategoryConversionStats.date, queryNextDate)
+          )
+        )
+        .orderBy(
+          asc(dailyCategoryConversionStats.date)
+        ),
       db
         .select({
           date: dailyVisitSources.date,
@@ -752,6 +789,90 @@ export async function getDashboardData(
         sum + row.count,
       0
     );
+  const dailyConversions =
+    dailyConversionRows
+      .filter(
+        (row) =>
+          monthFromDate(row.date) === month
+      )
+      .map((row) => ({
+        date: row.date,
+        consultations: row.consultations,
+        surgeries: row.surgeries,
+        rate:
+          row.consultations > 0
+            ? (row.surgeries / row.consultations) * 100
+            : 0,
+      }))
+      .sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+  const categoryNames = [
+    "코",
+    "눈",
+    "리프팅",
+    "쁘띠",
+  ];
+
+  function buildCategoryConversions(
+    targetMonth: string
+  ) {
+    return categoryNames.map(
+      (category) => {
+        const rows =
+          categoryConversionRows.filter(
+            (row) =>
+              monthFromDate(
+                row.date
+              ) ===
+                targetMonth &&
+              row.category ===
+                category
+          );
+
+        const consultations =
+          rows.reduce(
+            (sum, row) =>
+              sum +
+              row.consultations,
+            0
+          );
+
+        const surgeries =
+          rows.reduce(
+            (sum, row) =>
+              sum +
+              row.surgeries,
+            0
+          );
+
+        const rate =
+          consultations > 0
+            ? (surgeries /
+                consultations) *
+              100
+            : 0;
+
+        return {
+          category,
+          consultations,
+          surgeries,
+          rate,
+        };
+      }
+    );
+  }
+
+  const categoryConversions =
+    buildCategoryConversions(
+      month
+    );
+
+  const previousCategoryConversions =
+    buildCategoryConversions(
+      previousMonth
+    );
+
   return {
     selectedMonth:
       month,
@@ -764,6 +885,9 @@ export async function getDashboardData(
 
     monthlyVisitSources,
     totalVisitSourceCount,
+    dailyConversions,
+    categoryConversions,
+    previousCategoryConversions,
   };
 }
 

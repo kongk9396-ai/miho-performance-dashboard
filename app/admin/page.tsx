@@ -46,6 +46,13 @@ const menuGroups = [
     description: "상담실장 실적과 담당자를 관리합니다.",
     items: [
       {
+        title: "일별 상담 · 수술 입력",
+        description:
+          "날짜별 상담 건수와 수술 건수를 입력하고 상담 대비 수술 비율을 관리합니다.",
+        href: "/admin/conversion",
+        icon: BarChart3,
+      },
+      {
         title: "실장별 실적 · 매출",
         description:
           "월별 상담, 수술 전환, 전환율과 매출을 확인합니다.",

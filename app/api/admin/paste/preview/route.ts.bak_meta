@@ -619,7 +619,8 @@ function parseOneBlock(
 
         continue;
       }
-const existing =
+
+      const existing =
         result.platforms.find(
           (row) =>
             row.platform ===
@@ -668,15 +669,6 @@ const existing =
         continue;
       }
 
-      // META_VISIT_SOURCE_NORMALIZE
-      const compactSource =
-        parsed.source.replace(/\s+/g, "");
-
-      parsed.source =
-        compactSource === "메타광고" ||
-        compactSource === "매타광고"
-          ? "메타광고"
-          : parsed.source.trim();
       const existing =
         result.visitSources.find(
           (row) =>

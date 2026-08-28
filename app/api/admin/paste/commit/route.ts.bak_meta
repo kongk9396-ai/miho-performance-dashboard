@@ -588,15 +588,6 @@ export async function POST(
           continue;
         }
 
-        // META_VISIT_SOURCE_COMMIT_NORMALIZE
-        const compactSource =
-          source.source.replace(/\s+/g, "");
-
-        const normalizedSource =
-          compactSource === "메타광고" ||
-          compactSource === "매타광고"
-            ? "메타광고"
-            : source.source.trim();
         await db
           .insert(
             dailyVisitSources
@@ -606,7 +597,7 @@ export async function POST(
               day.date,
 
             source:
-              normalizedSource,
+              source.source.trim(),
 
             count:
               safeNumber(

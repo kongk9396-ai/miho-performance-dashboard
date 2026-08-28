@@ -60,13 +60,6 @@ type DashboardData = {
     surgeries: number;
     rate: number;
   }[];
-
-  previousCategoryConversions: {
-    category: string;
-    consultations: number;
-    surgeries: number;
-    rate: number;
-  }[];
 };
 
 function formatMonth(month: string) {
@@ -1666,81 +1659,7 @@ export default function DashboardClient({
                   );
                 })()}
               </article>
-            
-
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold">
-                      월별 내원 경로
-                    </h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 실제 내원 기준
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-xs text-zinc-400">
-                      총 내원
-                    </p>
-                    <p className="mt-1 text-2xl font-black text-zinc-950">
-                      {dashboardData.totalVisitSourceCount.toLocaleString()}
-                      <span className="ml-1 text-sm font-semibold text-zinc-400">
-                        명
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {dashboardData.monthlyVisitSources.length > 0 ? (
-                    dashboardData.monthlyVisitSources.map((row) => {
-                      const rate =
-                        dashboardData.totalVisitSourceCount > 0
-                          ? (row.count /
-                              dashboardData.totalVisitSourceCount) *
-                            100
-                          : 0;
-
-                      return (
-                        <div key={row.source}>
-                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                            <span className="font-semibold text-zinc-700">
-                              {row.source}
-                            </span>
-
-                            <span className="whitespace-nowrap text-zinc-500">
-                              <strong className="text-zinc-900">
-                                {row.count.toLocaleString()}명
-                              </strong>
-                              {" · "}
-                              {rate.toFixed(1)}%
-                            </span>
-                          </div>
-
-                          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
-                            <div
-                              className="h-full rounded-full bg-blue-600"
-                              style={{
-                                width: `${Math.max(
-                                  rate,
-                                  rate > 0 ? 2 : 0
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
-                      등록된 내원 경로 데이터가 없습니다.
-                    </div>
-                  )}
-                </div>
-              </article>
-            </section>
-<section className="mt-6">
+            <section className="mt-6">
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -1761,7 +1680,7 @@ export default function DashboardClient({
                   </a>
                 </div>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   {(dashboardData.categoryConversions ?? []).map(
                     (row) => (
                       <div
@@ -1836,6 +1755,78 @@ export default function DashboardClient({
               </article>
             </section>
 
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold">
+                      월별 내원 경로
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 실제 내원 기준
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-400">
+                      총 내원
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-zinc-950">
+                      {dashboardData.totalVisitSourceCount.toLocaleString()}
+                      <span className="ml-1 text-sm font-semibold text-zinc-400">
+                        명
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {dashboardData.monthlyVisitSources.length > 0 ? (
+                    dashboardData.monthlyVisitSources.map((row) => {
+                      const rate =
+                        dashboardData.totalVisitSourceCount > 0
+                          ? (row.count /
+                              dashboardData.totalVisitSourceCount) *
+                            100
+                          : 0;
+
+                      return (
+                        <div key={row.source}>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                            <span className="font-semibold text-zinc-700">
+                              {row.source}
+                            </span>
+
+                            <span className="whitespace-nowrap text-zinc-500">
+                              <strong className="text-zinc-900">
+                                {row.count.toLocaleString()}명
+                              </strong>
+                              {" · "}
+                              {rate.toFixed(1)}%
+                            </span>
+                          </div>
+
+                          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className="h-full rounded-full bg-blue-600"
+                              style={{
+                                width: `${Math.max(
+                                  rate,
+                                  rate > 0 ? 2 : 0
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+                      등록된 내원 경로 데이터가 없습니다.
+                    </div>
+                  )}
+                </div>
+              </article>
+            </section>
 
             <section className="mt-6">
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
