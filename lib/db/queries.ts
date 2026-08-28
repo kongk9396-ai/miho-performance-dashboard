@@ -763,9 +763,18 @@ export async function getDashboardData(
         month
     )
     .forEach((row) => {
+      const compactSource =
+        row.source.replace(/\s+/g, "");
+
+      const normalizedSource =
+        compactSource.includes("메타") ||
+        compactSource.includes("매타")
+          ? "메타광고"
+          : row.source.trim();
+
       visitSourceMap.set(
-        row.source,
-        (visitSourceMap.get(row.source) ?? 0) +
+        normalizedSource,
+        (visitSourceMap.get(normalizedSource) ?? 0) +
           row.count
       );
     });
