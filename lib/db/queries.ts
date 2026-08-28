@@ -882,6 +882,25 @@ export async function getDashboardData(
       previousMonth
     );
 
+  const dailyCategoryConversions =
+    categoryConversionRows
+      .filter(
+        (row) =>
+          monthFromDate(row.date) === month
+      )
+      .map((row) => ({
+        date: row.date,
+        category: row.category,
+        consultations: row.consultations,
+        surgeries: row.surgeries,
+        rate:
+          row.consultations > 0
+            ? (row.surgeries / row.consultations) * 100
+            : 0,
+      }))
+      .sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
   return {
     selectedMonth:
       month,
@@ -897,6 +916,7 @@ export async function getDashboardData(
     dailyConversions,
     categoryConversions,
     previousCategoryConversions,
+    dailyCategoryConversions,
   };
 }
 

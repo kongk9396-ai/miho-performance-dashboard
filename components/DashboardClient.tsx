@@ -1,5 +1,6 @@
 "use client";
 
+import CategoryTrendChart from "@/components/CategoryTrendChart";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -62,6 +63,14 @@ type DashboardData = {
   }[];
 
   previousCategoryConversions: {
+    category: string;
+    consultations: number;
+    surgeries: number;
+    rate: number;
+  }[];
+
+  dailyCategoryConversions: {
+    date: string;
     category: string;
     consultations: number;
     surgeries: number;
@@ -915,6 +924,9 @@ export default function DashboardClient({
   data: DashboardData;
   availableMonths: string[];
 }) {
+  const [selectedCategoryTrend, setSelectedCategoryTrend] =
+    useState("코");
+
   const [
     dashboardData,
     setDashboardData,
@@ -1833,6 +1845,129 @@ export default function DashboardClient({
                     )
                   )}
                 </div>
+              </article>
+            </section>
+            {/* CATEGORY_DAILY_TREND_SECTION */}
+            <section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-black text-zinc-900">
+                      카테고리 일별 추이
+                    </h2>
+
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 기준 일자별 상담 · 수술 변화
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {["코", "눈", "리프팅", "쁘띠"].map(
+                      (category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() =>
+                            setSelectedCategoryTrend(
+                              category
+                            )
+                          }
+                          className={
+                            selectedCategoryTrend ===
+                            category
+                              ? "rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white"
+                              : "rounded-xl bg-zinc-100 px-4 py-2 text-sm font-bold text-zinc-500 hover:bg-zinc-200"
+                          }
+                        >
+                          {category}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {(() => {
+                  const rows =
+                    (
+                      dashboardData.dailyCategoryConversions ??
+                      []
+                    ).filter(
+                      (row) =>
+                        row.category ===
+                        selectedCategoryTrend
+                    );
+
+                  const consultations =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum +
+                        row.consultations,
+                      0
+                    );
+
+                  const surgeries =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum +
+                        row.surgeries,
+                      0
+                    );
+
+                  const rate =
+                    consultations > 0
+                      ? (surgeries /
+                          consultations) *
+                        100
+                      : 0;
+
+                  return (
+                    <>
+                      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            {selectedCategoryTrend} 상담
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {consultations.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            {selectedCategoryTrend} 수술
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {surgeries.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-blue-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-blue-600">
+                            상담 대비 수술 비율
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-blue-700">
+                            {rate.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <CategoryTrendChart
+                          rows={rows}
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
               </article>
             </section>
 
