@@ -94,6 +94,7 @@ function getDashboardDateRange(
 
 type PlatformDbRow = {
   month: string;
+  date?: string;
 
   applications: number;
   reservations: number;
@@ -128,35 +129,70 @@ function getEffectivePlatformRows(
   monthlyRows: PlatformDbRow[],
   dailyRows: PlatformDbRow[]
 ) {
-  const dayRows =
-    dailyRows.filter(
-      (row) =>
-        row.month === month
-    );
+  const monthKey =
+    String(month).slice(0, 7);
 
   /*
-    일별 데이터가 없으면
-    기존 월간 데이터 그대로 사용
+    월간 보기:
+    엑셀의 월 합계 행에서 저장된 monthly 데이터를 최우선 사용한다.
+
+    일별 DB를 합산해서 월간 값을 만들지 않는다.
+    따라서 일별 누락이 있어도 월간 최종 합계는 영향을 받지 않는다.
   */
-  if (
-    dayRows.length === 0
-  ) {
-    return monthlyRows.filter(
+  const monthlyCandidates =
+    monthlyRows.filter(
       (row) =>
-        row.month === month
+        String(row.month).slice(0, 7) ===
+        monthKey
+    );
+
+  if (monthlyCandidates.length > 0) {
+    const latestMonthlyKey =
+      monthlyCandidates.reduce(
+        (latest, row) =>
+          String(row.month) > latest
+            ? String(row.month)
+            : latest,
+        ""
+      );
+
+    const latestRows =
+      monthlyCandidates.filter(
+        (row) =>
+          String(row.month) ===
+          latestMonthlyKey
+      );
+
+    const deduped =
+      new Map<string, PlatformDbRow>();
+
+    for (const row of latestRows) {
+      deduped.set(
+        row.platformName,
+        row
+      );
+    }
+
+    return Array.from(
+      deduped.values()
     );
   }
 
   /*
-    일별 데이터가 있으면
-    플랫폼별 합산
+    monthly 데이터가 없는 경우에만
+    일별 데이터를 플랫폼별로 합산해 fallback한다.
+
+    /api/daily와 DailyDashboard는 변경하지 않는다.
   */
+  const dayRows =
+    dailyRows.filter(
+      (row) =>
+        String(row.month).slice(0, 7) ===
+        monthKey
+    );
 
   const grouped =
-    new Map<
-      string,
-      PlatformDbRow
-    >();
+    new Map<string, PlatformDbRow>();
 
   for (const row of dayRows) {
     const existing =
@@ -175,6 +211,7 @@ function getEffectivePlatformRows(
         row.platformName,
         {
           ...row,
+          month: monthKey,
         }
       );
     }
@@ -188,7 +225,6 @@ function getEffectivePlatformRows(
 /* ========================================
    월 데이터 생성
 ======================================== */
-
 function buildMonthData(
   month: string,
   monthlyRows: PlatformDbRow[],
@@ -205,7 +241,8 @@ function buildMonthData(
   const conversion =
     conversionRows.find(
       (row) =>
-        row.month === month
+        String(row.month).slice(0, 7) ===
+        String(month).slice(0, 7)
     );
 
   if (
@@ -446,7 +483,7 @@ export async function getDashboardData(
 
             lte(
               monthlyPlatformStats.month,
-              month
+              `${String(month).slice(0, 7)}-01`
             )
           )
         )
@@ -541,7 +578,7 @@ export async function getDashboardData(
 
             lte(
               monthlyConversionStats.month,
-              month
+              `${String(month).slice(0, 7)}-01`
             )
           )
         )
@@ -620,6 +657,9 @@ export async function getDashboardData(
           monthFromDate(
             row.date
           ),
+
+        date:
+          row.date,
 
         applications:
           row.applications,
@@ -753,40 +793,30 @@ export async function getDashboardData(
       }
     );
 
-  const visitSourceMap =
-    new Map<string, number>();
+  /*
+    월별 예약 유입 채널
 
-  visitSourceRows
-    .filter(
-      (row) =>
-        monthFromDate(row.date) ===
-        month
-    )
-    .forEach((row) => {
-      const compactSource =
-        row.source.replace(/\s+/g, "");
+    실제 내원경로(daily_visit_sources)가 아니라
+    월간 플랫폼별 예약 실적을 사용한다.
 
-      const normalizedSource =
-        compactSource.includes("메타") ||
-        compactSource.includes("매타")
-          ? "메타광고"
-          : row.source.trim();
-
-      visitSourceMap.set(
-        normalizedSource,
-        (visitSourceMap.get(normalizedSource) ?? 0) +
-          row.count
-      );
-    });
-
+    따라서 바비톡 / 강남언니 / 네이버 /
+    플러스친구 / 홈페이지 등의 월 예약 건수가 표시된다.
+  */
   const monthlyVisitSources =
-    Array.from(
-      visitSourceMap.entries()
-    )
-      .map(([source, count]) => ({
-        source,
-        count,
-      }))
+    (current?.platformStats ?? [])
+      .filter(
+        (row) =>
+          row.reservations > 0
+      )
+      .map(
+        (row) => ({
+          source:
+            row.name,
+
+          count:
+            row.reservations,
+        })
+      )
       .sort(
         (a, b) =>
           b.count - a.count
@@ -975,19 +1005,21 @@ export async function getAvailableMonths() {
     new Set([
       ...monthlyRows.map(
         (row) =>
-          row.month
+          String(row.month).slice(0, 7)
       ),
 
       ...dailyRows.map(
         (row) =>
-          monthFromDate(
-            row.date
-          )
+          String(
+            monthFromDate(
+              row.date
+            )
+          ).slice(0, 7)
       ),
 
       ...conversionRows.map(
         (row) =>
-          row.month
+          String(row.month).slice(0, 7)
       ),
     ])
   ).sort(

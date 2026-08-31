@@ -1,5 +1,4 @@
-
-import DashboardClient from "@/components/DashboardClient";
+﻿import DashboardClient from "@/components/DashboardClient";
 
 import {
   getAvailableMonths,
@@ -25,7 +24,7 @@ export default async function Home({
 
   const requestedMonth =
     typeof params.month === "string"
-      ? params.month
+      ? params.month.slice(0, 7)
       : null;
 
   const selectedMonth =
@@ -33,7 +32,7 @@ export default async function Home({
     availableMonths.includes(requestedMonth)
       ? requestedMonth
       : availableMonths[0] ??
-        "2026-07-01";
+        "2026-07";
 
   const data =
     await getDashboardData(

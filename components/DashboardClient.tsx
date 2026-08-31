@@ -1528,19 +1528,32 @@ export default function DashboardClient({
                   const rows =
                     dashboardData.dailyConversions ?? [];
 
-                  const totalConsultations =
+                  const dailyConsultations =
                     rows.reduce(
                       (sum, row) =>
                         sum + row.consultations,
                       0
                     );
 
-                  const totalSurgeries =
+                  const dailySurgeries =
                     rows.reduce(
                       (sum, row) =>
                         sum + row.surgeries,
                       0
                     );
+
+                  const hasDailyConversionData =
+                    rows.length > 0;
+
+                  const totalConsultations =
+                    hasDailyConversionData
+                      ? dailyConsultations
+                      : dashboardData.current?.consultations ?? 0;
+
+                  const totalSurgeries =
+                    hasDailyConversionData
+                      ? dailySurgeries
+                      : dashboardData.current?.surgeries ?? 0;
 
                   const totalRate =
                     totalConsultations > 0
@@ -1684,16 +1697,16 @@ export default function DashboardClient({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold">
-                      월별 내원 경로
+                      월별 예약 유입 경로
                     </h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 실제 내원 기준
+                      선택 월 플랫폼별 예약 기준
                     </p>
                   </div>
 
                   <div className="text-right">
                     <p className="text-xs text-zinc-400">
-                      총 내원
+                      총 예약
                     </p>
                     <p className="mt-1 text-2xl font-black text-zinc-950">
                       {dashboardData.totalVisitSourceCount.toLocaleString()}
