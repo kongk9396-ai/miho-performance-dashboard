@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-
 import {
   dailyPlatformStats,
   monthlyConversionStats,
   monthlyPlatformStats,
   platforms,
 } from "@/lib/db/schema";
-
 import { isAdminAuthenticated } from "@/lib/auth/admin";
 
 export const runtime = "nodejs";
@@ -17,20 +15,17 @@ export const dynamic = "force-dynamic";
 
 type ImportMonth = {
   month: string;
-
-  platforms: {
+  platforms?: {
     platform: string;
     applications: number;
     reservations: number;
   }[];
-
-  dailyPlatforms: {
+  dailyPlatforms?: {
     date: string;
     platform: string;
     applications: number;
     reservations: number;
   }[];
-
   consultations: number | null;
   surgeries: number | null;
 };
@@ -40,463 +35,407 @@ type ImportBody = {
   mode: "overwrite" | "skip";
 };
 
-function normalizePlatformName(value: string) {
-  return value
+function compactText(value: unknown) {
+  return String(value ?? "")
     .trim()
-    .replace(/\s+/g, "");
+    .replace(/\s+/g, "")
+    .replace(/[·ㆍ]/g, "")
+    .toLowerCase();
+}
+
+function normalizePlatformName(value: unknown) {
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+  const compact = compactText(value);
+
+  const aliases: Record<string, string> = {
+    바비톡: "바비톡",
+    강남언니: "강남언니",
+    네이버: "네이버",
+    플러스친구: "플러스친구",
+    카카오플러스친구: "플러스친구",
+    카카오친구: "플러스친구",
+    플친: "플러스친구",
+    홈페이지: "홈페이지",
+    인콜: "인콜",
+    총인콜: "인콜",
+    cpa: "CPA",
+    cpa광고: "CPA 광고",
+  };
+
+  return aliases[compact] ?? raw.replace(/\s+/g, "");
 }
 
 function safeNumber(value: unknown) {
-  return Math.max(
-    0,
-    Math.round(Number(value) || 0)
+  return Math.max(0, Math.round(Number(value) || 0));
+}
+
+function normalizeMonthStart(value: unknown) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function isValidDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() + 1 === month &&
+    date.getUTCDate() === day
   );
 }
 
-export async function POST(
-  request: NextRequest
-) {
-  /*
-    관리자 인증
-  */
-  if (
-    !(await isAdminAuthenticated())
-  ) {
+function getNextMonthStart(monthStart: string) {
+  const [yearText, monthText] = monthStart.split("-");
+  const year = Number(yearText);
+  const monthNumber = Number(monthText);
+
+  const next = new Date(Date.UTC(year, monthNumber, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(
+    2,
+    "0"
+  )}-01`;
+}
+
+export async function POST(request: NextRequest) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json(
-      {
-        ok: false,
-        message:
-          "관리자 로그인이 필요합니다.",
-      },
-      {
-        status: 401,
-      }
+      { ok: false, message: "관리자 로그인이 필요합니다." },
+      { status: 401 }
     );
   }
 
   try {
-    const body =
-      (await request.json()) as ImportBody;
+    const body = (await request.json()) as ImportBody;
 
-    if (
-      !Array.isArray(body.months) ||
-      body.months.length === 0
-    ) {
+    if (!Array.isArray(body.months) || body.months.length === 0) {
       return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "저장할 데이터가 없습니다.",
-        },
-        {
-          status: 400,
-        }
+        { ok: false, message: "저장할 데이터가 없습니다." },
+        { status: 400 }
       );
     }
 
-    const mode =
-      body.mode === "skip"
-        ? "skip"
-        : "overwrite";
+    const mode = body.mode === "skip" ? "skip" : "overwrite";
 
-    /*
-      플랫폼 마스터
-    */
-
-    const platformMasters =
-      await db
-        .select()
-        .from(platforms);
-
-    const platformMap =
-      new Map(
-        platformMasters.map(
-          (row) => [
-            normalizePlatformName(
-              row.name
-            ),
-            row,
-          ]
-        )
-      );
+    const platformMasters = await db.select().from(platforms);
+    const platformMap = new Map(
+      platformMasters.map((row) => [compactText(row.name), row])
+    );
 
     let savedMonths = 0;
     let skippedMonths = 0;
+    let monthlyRowsSaved = 0;
     let dailyRowsSaved = 0;
+    let conversionMonthsSaved = 0;
+    let preservedDatasets = 0;
 
-    /*
-      월별 저장
-    */
+    for (const monthData of body.months) {
+      const monthStart = normalizeMonthStart(monthData.month);
+      if (!monthStart) continue;
 
-    for (
-      const monthData of body.months
-    ) {
-      if (
-        !monthData.month ||
-        !/^\d{4}-\d{2}-01$/.test(
-          monthData.month
-        )
-      ) {
-        continue;
+      const nextMonthStart = getNextMonthStart(monthStart);
+
+      const monthlyInputMap = new Map<
+        string,
+        { platform: string; applications: number; reservations: number }
+      >();
+
+      for (const row of monthData.platforms ?? []) {
+        const platform = normalizePlatformName(row.platform);
+        const key = compactText(platform);
+        if (!platform || !key) continue;
+
+        monthlyInputMap.set(key, {
+          platform,
+          applications: safeNumber(row.applications),
+          reservations: safeNumber(row.reservations),
+        });
       }
 
-      /*
-        기존 월 존재 여부
-      */
+      const dailyInputMap = new Map<
+        string,
+        {
+          date: string;
+          platform: string;
+          applications: number;
+          reservations: number;
+        }
+      >();
 
-      const existingMonth =
-        await db
-          .select({
-            id:
-              monthlyPlatformStats.id,
-          })
-          .from(
-            monthlyPlatformStats
-          )
-          .where(
-            eq(
-              monthlyPlatformStats.month,
-              monthData.month
-            )
-          );
-
-      /*
-        skip 모드라면
-        기존 월은 건너뜀
-      */
-
-      if (
-        mode === "skip" &&
-        existingMonth.length > 0
-      ) {
-        skippedMonths++;
-        continue;
-      }
-
-      /*
-        엑셀에 있는데
-        플랫폼 마스터에 없는 플랫폼은
-        자동 생성
-      */
-
-      const allPlatformNames =
-        Array.from(
-          new Set([
-            ...(
-              monthData.platforms ??
-              []
-            ).map(
-              (row) =>
-                row.platform
-            ),
-
-            ...(
-              monthData.dailyPlatforms ??
-              []
-            ).map(
-              (row) =>
-                row.platform
-            ),
-          ])
-        ).filter(
-          (name) =>
-            String(name)
-              .trim()
-              .length > 0
-        );
-
-      for (
-        const platformName of
-        allPlatformNames
-      ) {
-        const normalized =
-          normalizePlatformName(
-            platformName
-          );
+      for (const row of monthData.dailyPlatforms ?? []) {
+        const date = String(row.date ?? "").trim();
+        const platform = normalizePlatformName(row.platform);
+        const platformKey = compactText(platform);
 
         if (
-          platformMap.has(
-            normalized
-          )
+          !isValidDate(date) ||
+          date < monthStart ||
+          date >= nextMonthStart ||
+          !platform ||
+          !platformKey
         ) {
           continue;
         }
 
-        const [created] =
+        dailyInputMap.set(`${date}|${platformKey}`, {
+          date,
+          platform,
+          applications: safeNumber(row.applications),
+          reservations: safeNumber(row.reservations),
+        });
+      }
+
+      const incomingMonthly = Array.from(monthlyInputMap.values());
+      const incomingDaily = Array.from(dailyInputMap.values());
+      const hasIncomingConversion =
+        monthData.consultations !== null || monthData.surgeries !== null;
+
+      const allPlatformNames = Array.from(
+        new Set([
+          ...incomingMonthly.map((row) => row.platform),
+          ...incomingDaily.map((row) => row.platform),
+        ])
+      );
+
+      for (const platformName of allPlatformNames) {
+        const key = compactText(platformName);
+        if (platformMap.has(key)) continue;
+
+        const hideFromChannelChart = key === "인콜" || key === "총인콜";
+
+        const [created] = await db
+          .insert(platforms)
+          .values({
+            name: platformName,
+            sortOrder: platformMap.size + 1,
+            isActive: true,
+            includeInTotal: true,
+            includeInChannelChart: !hideFromChannelChart,
+          })
+          .returning();
+
+        platformMap.set(key, created);
+      }
+
+      const [existingMonthly, existingDaily, existingConversion] =
+        await Promise.all([
+          db
+            .select({ id: monthlyPlatformStats.id })
+            .from(monthlyPlatformStats)
+            .where(eq(monthlyPlatformStats.month, monthStart))
+            .limit(1),
+          db
+            .select({ id: dailyPlatformStats.id })
+            .from(dailyPlatformStats)
+            .where(
+              and(
+                gte(dailyPlatformStats.date, monthStart),
+                lt(dailyPlatformStats.date, nextMonthStart)
+              )
+            )
+            .limit(1),
+          db
+            .select({ id: monthlyConversionStats.id })
+            .from(monthlyConversionStats)
+            .where(eq(monthlyConversionStats.month, monthStart))
+            .limit(1),
+        ]);
+
+      let wroteSomething = false;
+      let skippedSomething = false;
+
+      const shouldWriteMonthly =
+        incomingMonthly.length > 0 &&
+        (mode === "overwrite" || existingMonthly.length === 0);
+
+      if (shouldWriteMonthly) {
+        if (mode === "overwrite") {
           await db
-            .insert(platforms)
-            .values({
-              name:
-                platformName.trim(),
-
-              sortOrder:
-                platformMap.size +
-                1,
-
-              isActive: true,
-
-              includeInTotal:
-                true,
-
-              includeInChannelChart:
-                normalized !==
-                "총인콜",
-            })
-            .returning();
-
-        platformMap.set(
-          normalized,
-          created
-        );
-      }
-
-      /*
-        OVERWRITE 모드
-
-        기존 월 데이터 삭제 후
-        새 엑셀 데이터로 재생성
-
-        이렇게 해야 예전에 존재했던
-        플랫폼 행이 새 파일에서 빠졌을 때도
-        이전 값이 남지 않는다.
-      */
-
-      if (mode === "overwrite") {
-        await db
-          .delete(
-            monthlyPlatformStats
-          )
-          .where(
-            eq(
-              monthlyPlatformStats.month,
-              monthData.month
-            )
-          );
-
-        /*
-          일별 데이터도 해당 월 전체 삭제
-
-          date가 YYYY-MM-DD 형식이라
-          Drizzle eq만으로 월 전체 삭제하기
-          어려우므로 가져온 일자의 기존값을
-          아래에서 upsert한다.
-
-          현재 import 구조에서는
-          같은 날짜/플랫폼 값은 덮어쓴다.
-        */
-      }
-
-      /*
-        월별 플랫폼 저장
-      */
-
-      for (
-        const row of
-        monthData.platforms ?? []
-      ) {
-        const normalized =
-          normalizePlatformName(
-            row.platform
-          );
-
-        const platform =
-          platformMap.get(
-            normalized
-          );
-
-        if (!platform) {
-          continue;
+            .delete(monthlyPlatformStats)
+            .where(eq(monthlyPlatformStats.month, monthStart));
         }
 
-        const applications =
-          safeNumber(
-            row.applications
-          );
+        const values = incomingMonthly
+          .map((row) => {
+            const platform = platformMap.get(compactText(row.platform));
+            if (!platform) return null;
 
-        const reservations =
-          safeNumber(
-            row.reservations
-          );
-
-        await db
-          .insert(
-            monthlyPlatformStats
-          )
-          .values({
-            month:
-              monthData.month,
-
-            platformId:
-              platform.id,
-
-            applications,
-
-            reservations,
+            return {
+              month: monthStart,
+              platformId: platform.id,
+              applications: row.applications,
+              reservations: row.reservations,
+            };
           })
-          .onConflictDoUpdate({
-            target: [
-              monthlyPlatformStats.month,
-              monthlyPlatformStats.platformId,
-            ],
+          .filter(
+            (
+              row
+            ): row is {
+              month: string;
+              platformId: number;
+              applications: number;
+              reservations: number;
+            } => row !== null
+          );
 
-            set: {
-              applications,
-              reservations,
+        if (values.length > 0) {
+          await db
+            .insert(monthlyPlatformStats)
+            .values(values)
+            .onConflictDoUpdate({
+              target: [
+                monthlyPlatformStats.month,
+                monthlyPlatformStats.platformId,
+              ],
+              set: {
+                applications: sql`excluded.applications`,
+                reservations: sql`excluded.reservations`,
+                updatedAt: new Date(),
+              },
+            });
 
-              updatedAt:
-                new Date(),
-            },
-          });
+          monthlyRowsSaved += values.length;
+          wroteSomething = true;
+        }
+      } else if (incomingMonthly.length > 0) {
+        skippedSomething = true;
+      } else if (existingMonthly.length > 0) {
+        preservedDatasets++;
       }
 
-      /*
-        일별 플랫폼 저장
-      */
+      const shouldWriteDaily =
+        incomingDaily.length > 0 &&
+        (mode === "overwrite" || existingDaily.length === 0);
 
-      for (
-        const row of
-        monthData.dailyPlatforms ??
-        []
-      ) {
-        if (
-          !row.date ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(
-            row.date
-          )
-        ) {
-          continue;
+      if (shouldWriteDaily) {
+        if (mode === "overwrite") {
+          await db
+            .delete(dailyPlatformStats)
+            .where(
+              and(
+                gte(dailyPlatformStats.date, monthStart),
+                lt(dailyPlatformStats.date, nextMonthStart)
+              )
+            );
         }
 
-        const normalized =
-          normalizePlatformName(
-            row.platform
-          );
+        const dailyValues = incomingDaily
+          .map((row) => {
+            const platform = platformMap.get(compactText(row.platform));
+            if (!platform) return null;
 
-        const platform =
-          platformMap.get(
-            normalized
-          );
-
-        if (!platform) {
-          continue;
-        }
-
-        const applications =
-          safeNumber(
-            row.applications
-          );
-
-        const reservations =
-          safeNumber(
-            row.reservations
-          );
-
-        await db
-          .insert(
-            dailyPlatformStats
-          )
-          .values({
-            date:
-              row.date,
-
-            platformId:
-              platform.id,
-
-            applications,
-
-            reservations,
+            return {
+              date: row.date,
+              platformId: platform.id,
+              applications: row.applications,
+              reservations: row.reservations,
+            };
           })
-          .onConflictDoUpdate({
-            target: [
-              dailyPlatformStats.date,
-              dailyPlatformStats.platformId,
-            ],
+          .filter(
+            (
+              row
+            ): row is {
+              date: string;
+              platformId: number;
+              applications: number;
+              reservations: number;
+            } => row !== null
+          );
 
-            set: {
-              applications,
-              reservations,
+        const chunkSize = 500;
+        for (let i = 0; i < dailyValues.length; i += chunkSize) {
+          const chunk = dailyValues.slice(i, i + chunkSize);
+          await db
+            .insert(dailyPlatformStats)
+            .values(chunk)
+            .onConflictDoUpdate({
+              target: [dailyPlatformStats.date, dailyPlatformStats.platformId],
+              set: {
+                applications: sql`excluded.applications`,
+                reservations: sql`excluded.reservations`,
+                updatedAt: new Date(),
+              },
+            });
+        }
 
-              updatedAt:
-                new Date(),
-            },
-          });
-
-        dailyRowsSaved++;
+        dailyRowsSaved += dailyValues.length;
+        wroteSomething = wroteSomething || dailyValues.length > 0;
+      } else if (incomingDaily.length > 0) {
+        skippedSomething = true;
+      } else if (existingDaily.length > 0) {
+        preservedDatasets++;
       }
 
-      /*
-        상담 / 수술 전환
-      */
+      const shouldWriteConversion =
+        hasIncomingConversion &&
+        (mode === "overwrite" || existingConversion.length === 0);
 
-      if (
-        monthData.consultations !==
-          null ||
-        monthData.surgeries !== null
-      ) {
-        const consultations =
-          safeNumber(
-            monthData.consultations
-          );
-
-        const surgeries =
-          safeNumber(
-            monthData.surgeries
-          );
+      if (shouldWriteConversion) {
+        const consultations = safeNumber(monthData.consultations);
+        const surgeries = safeNumber(monthData.surgeries);
 
         await db
-          .insert(
-            monthlyConversionStats
-          )
+          .insert(monthlyConversionStats)
           .values({
-            month:
-              monthData.month,
-
+            month: monthStart,
             consultations,
-
             surgeries,
           })
           .onConflictDoUpdate({
-            target:
-              monthlyConversionStats.month,
-
+            target: monthlyConversionStats.month,
             set: {
               consultations,
               surgeries,
-
-              updatedAt:
-                new Date(),
+              updatedAt: new Date(),
             },
           });
+
+        conversionMonthsSaved++;
+        wroteSomething = true;
+      } else if (hasIncomingConversion) {
+        skippedSomething = true;
+      } else if (existingConversion.length > 0) {
+        preservedDatasets++;
       }
 
-      savedMonths++;
+      if (wroteSomething) savedMonths++;
+      else if (skippedSomething) skippedMonths++;
     }
 
     return NextResponse.json({
       ok: true,
-
-      message:
-        "엑셀 데이터를 저장했습니다.",
-
+      message: "엑셀 데이터를 안전하게 병합 저장했습니다.",
       savedMonths,
       skippedMonths,
+      monthlyRowsSaved,
       dailyRowsSaved,
+      conversionMonthsSaved,
+      preservedDatasets,
     });
   } catch (error) {
-    console.error(
-      "Excel import commit error:",
-      error
-    );
+    console.error("Excel import commit error:", error);
 
     return NextResponse.json(
       {
         ok: false,
         message:
-          "엑셀 데이터 저장 중 오류가 발생했습니다.",
+          error instanceof Error
+            ? `엑셀 데이터 저장 중 오류: ${error.message}`
+            : "엑셀 데이터 저장 중 오류가 발생했습니다.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
