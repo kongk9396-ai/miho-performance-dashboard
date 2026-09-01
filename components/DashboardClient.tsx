@@ -1697,16 +1697,16 @@ export default function DashboardClient({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold">
-                      월별 예약 유입 경로
+                      월별 내원 경로
                     </h2>
                     <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 플랫폼별 예약 기준
+                      선택 월 실제 내원 기준
                     </p>
                   </div>
 
                   <div className="text-right">
                     <p className="text-xs text-zinc-400">
-                      총 예약
+                      총 내원
                     </p>
                     <p className="mt-1 text-2xl font-black text-zinc-950">
                       {dashboardData.totalVisitSourceCount.toLocaleString()}

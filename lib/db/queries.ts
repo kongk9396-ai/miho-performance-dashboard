@@ -794,27 +794,92 @@ export async function getDashboardData(
     );
 
   /*
-    월별 예약 유입 채널
+    월별 실제 내원 경로
 
-    실제 내원경로(daily_visit_sources)가 아니라
-    월간 플랫폼별 예약 실적을 사용한다.
+    daily_visit_sources의 날짜별 데이터를
+    선택 월 기준으로 합산한다.
 
-    따라서 바비톡 / 강남언니 / 네이버 /
-    플러스친구 / 홈페이지 등의 월 예약 건수가 표시된다.
+    유튜브 표기 차이는 하나로 통합한다.
   */
-  const monthlyVisitSources =
-    (current?.platformStats ?? [])
-      .filter(
-        (row) =>
-          row.reservations > 0
-      )
-      .map(
-        (row) => ({
-          source:
-            row.name,
+  const visitSourceMap =
+    new Map<string, number>();
 
-          count:
-            row.reservations,
+  visitSourceRows
+    .filter(
+      (row) =>
+        String(
+          monthFromDate(
+            row.date
+          )
+        ).slice(0, 7) ===
+        String(month).slice(0, 7)
+    )
+    .forEach((row) => {
+      const rawSource =
+        String(
+          row.source ?? ""
+        ).trim();
+
+      const compactSource =
+        rawSource
+          .replace(/\s+/g, "")
+          .toLowerCase();
+
+      let normalizedSource =
+        rawSource;
+
+      if (
+        [
+          "유튜브",
+          "유투브",
+          "유튭",
+          "유트브",
+          "youtube",
+          "yt",
+        ].includes(
+          compactSource
+        )
+      ) {
+        normalizedSource =
+          "유튜브";
+      } else if (
+        [
+          "메타광고",
+          "매타광고",
+          "메타",
+          "매타",
+          "meta",
+          "meta광고",
+        ].includes(
+          compactSource
+        )
+      ) {
+        normalizedSource =
+          "메타광고";
+      }
+
+      if (!normalizedSource) {
+        return;
+      }
+
+      visitSourceMap.set(
+        normalizedSource,
+        (
+          visitSourceMap.get(
+            normalizedSource
+          ) ?? 0
+        ) + row.count
+      );
+    });
+
+  const monthlyVisitSources =
+    Array.from(
+      visitSourceMap.entries()
+    )
+      .map(
+        ([source, count]) => ({
+          source,
+          count,
         })
       )
       .sort(
