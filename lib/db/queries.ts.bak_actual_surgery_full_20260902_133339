@@ -593,7 +593,6 @@ export async function getDashboardData(
       db
         .select({
           date: dailyConversionStats.date,
-          actualSurgeries: dailyConversionStats.actualSurgeries,
           consultations: dailyConversionStats.consultations,
           surgeries: dailyConversionStats.surgeries,
         })
@@ -929,8 +928,6 @@ export async function getDashboardData(
     dailyConversionRows
       .map((row) => ({
         date: row.date,
-        actualSurgeries:
-          Number(row.actualSurgeries ?? 0),
         consultations: row.consultations,
         surgeries: row.surgeries,
         rate:

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
 import { isAdminAuthenticated } from "@/lib/auth/admin";
@@ -73,7 +73,6 @@ type MonthAccumulator = {
   dailyTotalReservations: number | null;
 dailyConversionMap: Map<string, DailyConversionRow>;
     doctorMap: Map<string, DoctorConversionRow>;
-  actualSurgeries: number | null;
 consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -1722,8 +1721,6 @@ function parseSheet(
     dailyTotalReservations:
       dailyGrandTotal.reservations,
     dailyConversions: dailyConversion.rows,
-    actualSurgeries:
-      dailyConversion.actualSurgeries ?? null,
     doctorConversions,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,

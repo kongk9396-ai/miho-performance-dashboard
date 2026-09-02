@@ -298,13 +298,7 @@ export const dailyConversionStats = pgTable(
       .notNull()
       .default(0),
 
-    
-    actualSurgeries:
-      integer("actual_surgeries")
-        .notNull()
-        .default(0),
-
-surgeries: integer("surgeries")
+    surgeries: integer("surgeries")
       .notNull()
       .default(0),
 

@@ -30,7 +30,6 @@ type ImportMonth = {
   }[];
   dailyConversions?: {
     date: string;
-    actualSurgeries: number;
     consultations: number;
     surgeries: number;
   }[];
@@ -441,10 +440,6 @@ export async function POST(request: NextRequest) {
           incomingDailyConversions.map(
             (row) => ({
               date: row.date,
-              actualSurgeries:
-                safeNumber(
-                  row.actualSurgeries
-                ),
               consultations:
                 safeNumber(row.consultations),
               surgeries:
@@ -459,8 +454,6 @@ export async function POST(request: NextRequest) {
             target:
               dailyConversionStats.date,
             set: {
-              actualSurgeries:
-                sql`excluded.actual_surgeries`,
               consultations:
                 sql`excluded.consultations`,
               surgeries:

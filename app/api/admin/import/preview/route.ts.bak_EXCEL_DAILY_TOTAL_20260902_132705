@@ -21,7 +21,6 @@ type DailyPlatformRow = {
 
 type DailyConversionRow = {
   date: string;
-  actualSurgeries?: number;
   consultations: number;
   surgeries: number;
 };
@@ -37,11 +36,8 @@ type MonthPreview = {
   month: string;
   platforms: PlatformRow[];
   dailyPlatforms: DailyPlatformRow[];
-  dailyTotalApplications: number | null;
-  dailyTotalReservations: number | null;
   dailyConversions: DailyConversionRow[];
   doctorConversions: DoctorConversionRow[];
-  actualSurgeries: number;
   consultations: number | null;
   surgeries: number | null;
   sources: string[];
@@ -53,11 +49,8 @@ type SheetCandidate = {
   monthlyPlatforms: PlatformRow[];
   monthlyPlatformScore: number;
   dailyPlatforms: DailyPlatformRow[];
-  dailyTotalApplications: number | null;
-  dailyTotalReservations: number | null;
   dailyConversions: DailyConversionRow[];
   doctorConversions: DoctorConversionRow[];
-  actualSurgeries: number | null;
   consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -69,11 +62,8 @@ type MonthAccumulator = {
   platformMap: Map<string, PlatformRow>;
   platformScore: number;
   dailyMap: Map<string, DailyPlatformRow>;
-    dailyTotalApplications: number | null;
-  dailyTotalReservations: number | null;
-dailyConversionMap: Map<string, DailyConversionRow>;
+  dailyConversionMap: Map<string, DailyConversionRow>;
     doctorMap: Map<string, DoctorConversionRow>;
-  actualSurgeries: number | null;
 consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -334,129 +324,6 @@ function findDateColumn(
 
   return bestCount >= 2 ? bestColumn : -1;
 }
-
-
-/*
- * ============================================
- * Excel "일일 합계"의 합계행 직접 읽기
- *
- * 월마다 일일합계 열 위치가 다름:
- * 8/7/6월 U/V
- * 5월 S/T
- * 4월 이하 Q/R ...
- *
- * 따라서 열 번호 고정하지 않고
- * "일일 합계" 헤더를 찾아서 읽는다.
- * ============================================
- */
-function parseExcelDailyGrandTotal(
-  rows: unknown[][]
-) {
-  let headerRow = -1;
-  let applicationCol = -1;
-  let reservationCol = -1;
-
-  /*
-   * '일일 합계' 헤더 찾기
-   */
-  for (
-    let r = 0;
-    r < Math.min(rows.length, 30);
-    r++
-  ) {
-    const row = rows[r] ?? [];
-
-    for (
-      let c = 0;
-      c < row.length;
-      c++
-    ) {
-      if (
-        compactText(row[c]) ===
-        "일일합계"
-      ) {
-        headerRow = r;
-        applicationCol = c;
-        reservationCol = c + 1;
-        break;
-      }
-    }
-
-    if (headerRow >= 0) {
-      break;
-    }
-  }
-
-  if (
-    headerRow < 0 ||
-    applicationCol < 0
-  ) {
-    return {
-      applications: null as number | null,
-      reservations: null as number | null,
-    };
-  }
-
-  /*
-   * 일일합계 헤더 아래에서
-   * '합계' 행을 찾는다.
-   */
-  for (
-    let r = headerRow + 1;
-    r < Math.min(
-      rows.length,
-      headerRow + 50
-    );
-    r++
-  ) {
-    const row = rows[r] ?? [];
-
-    const hasTotalLabel =
-      row.some((cell) => {
-        const text =
-          compactText(cell);
-
-        return (
-          text === "합계" ||
-          text === "월합계" ||
-          text === "총합"
-        );
-      });
-
-    if (!hasTotalLabel) {
-      continue;
-    }
-
-    const applications =
-      intValue(
-        row[applicationCol]
-      );
-
-    const reservations =
-      intValue(
-        row[reservationCol]
-      );
-
-    if (
-      applications !== null ||
-      reservations !== null
-    ) {
-      return {
-        applications:
-          applications ?? 0,
-
-        reservations:
-          reservations ?? 0,
-      };
-    }
-  }
-
-  return {
-    applications: null as number | null,
-    reservations: null as number | null,
-  };
-}
-
 
 function parseDailyPlatformLayout(rows: unknown[][], month: string) {
   const warnings: string[] = [];
@@ -1290,7 +1157,6 @@ function parseDailyConversionLayout(
     rows[headerRow] ?? [];
 
   let dateCol = -1;
-  let actualSurgeryCol = -1;
   let consultationCol = -1;
   let conversionCol = -1;
 
@@ -1322,15 +1188,6 @@ function parseDailyConversionLayout(
     }
 
     if (
-      text === "수술수" ||
-      text === "수술건수" ||
-      text === "실제수술" ||
-      text === "실수술"
-    ) {
-      actualSurgeryCol = c;
-    }
-
-    if (
       text === "상담" ||
       text === "상담수" ||
       text === "상담건수"
@@ -1349,16 +1206,7 @@ function parseDailyConversionLayout(
   }
 
   if (
-    actualSurgeryCol < 0 &&
-    dateCol >= 0
-  ) {
-    actualSurgeryCol =
-      dateCol + 1;
-  }
-
-  if (
     dateCol < 0 ||
-    actualSurgeryCol < 0 ||
     consultationCol < 0 ||
     conversionCol < 0
   ) {
@@ -1374,9 +1222,6 @@ function parseDailyConversionLayout(
 
   const targetMonth =
     monthKey(month);
-
-  let sheetTotalActualSurgeries:
-    number | null = null;
 
   let sheetTotalConsultations:
     number | null = null;
@@ -1411,13 +1256,6 @@ function parseDailyConversionLayout(
       marker === "합계" ||
       marker === "총합"
     ) {
-      sheetTotalActualSurgeries =
-        intValue(
-          row[
-            actualSurgeryCol
-          ]
-        );
-
       sheetTotalConsultations =
         intValue(
           row[
@@ -1475,13 +1313,6 @@ function parseDailyConversionLayout(
         ? parsedDate
         : fallbackDate;
 
-    const actualSurgeries =
-      intValue(
-        row[
-          actualSurgeryCol
-        ]
-      ) ?? 0;
-
     const consultations =
       intValue(
         row[
@@ -1498,7 +1329,6 @@ function parseDailyConversionLayout(
 
     result.push({
       date,
-      actualSurgeries,
       consultations,
       surgeries,
     });
@@ -1558,22 +1388,8 @@ function parseDailyConversionLayout(
       ? sheetTotalSurgeries
       : calculatedSurgeries;
 
-  const actualSurgeries =
-    sheetTotalActualSurgeries !== null
-      ? sheetTotalActualSurgeries
-      : dailyRows.reduce(
-          (sum, row) =>
-            sum + Number(row.actualSurgeries ?? 0),
-          0
-        );
-
   return {
     rows: dailyRows,
-
-    actualSurgeries:
-      dailyRows.length > 0
-        ? actualSurgeries
-        : null,
 
     consultations:
       dailyRows.length > 0
@@ -1649,11 +1465,6 @@ function parseSheet(
   const warnings: string[] = [];
 
   const dailyLayout = parseDailyPlatformLayout(rows, month);
-
-  const dailyGrandTotal =
-    parseExcelDailyGrandTotal(
-      rows
-    );
   warnings.push(...dailyLayout.warnings);
 
   const comparisonLayout = parseComparisonPlatformLayout(rows);
@@ -1717,13 +1528,7 @@ function parseSheet(
     monthlyPlatforms,
     monthlyPlatformScore,
     dailyPlatforms: dailyLayout.dailyPlatforms,
-    dailyTotalApplications:
-      dailyGrandTotal.applications,
-    dailyTotalReservations:
-      dailyGrandTotal.reservations,
     dailyConversions: dailyConversion.rows,
-    actualSurgeries:
-      dailyConversion.actualSurgeries ?? null,
     doctorConversions,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,
@@ -1744,11 +1549,8 @@ function getAccumulator(
     platformMap: new Map(),
     platformScore: 0,
     dailyMap: new Map(),
-    dailyTotalApplications: null,
-    dailyTotalReservations: null,
     dailyConversionMap: new Map(),
     doctorMap: new Map(),
-    actualSurgeries: null,
     consultations: null,
     surgeries: null,
     conversionScore: 0,
@@ -1780,24 +1582,6 @@ function mergeCandidate(
         accumulator.platformMap.set(compactText(row.platform), row);
       }
     }
-  }
-
-  /*
-   * Excel의 "일일 합계" 월 합계는
-   * 재계산하지 않고 원본값 그대로 사용.
-   */
-  if (
-    candidate.dailyTotalApplications !== null
-  ) {
-    accumulator.dailyTotalApplications =
-      candidate.dailyTotalApplications;
-  }
-
-  if (
-    candidate.dailyTotalReservations !== null
-  ) {
-    accumulator.dailyTotalReservations =
-      candidate.dailyTotalReservations;
   }
 
   for (const row of candidate.dailyPlatforms) {
@@ -1832,11 +1616,6 @@ function mergeCandidate(
       row.doctorName,
       row
     );
-  }
-
-  if (candidate.actualSurgeries !== null) {
-    accumulator.actualSurgeries =
-      candidate.actualSurgeries;
   }
 
   if (candidate.conversionScore > accumulator.conversionScore) {
@@ -1938,23 +1717,13 @@ export async function POST(request: NextRequest) {
          * 일별 데이터가 없는 과거 월만
          * 기존 월간 플랫폼 합계를 fallback으로 사용.
          */
-                /*
-         * 신청/예약 월 합계는
-         * Excel의 "일일 합계" 합계행을 최우선 사용.
-         *
-         * 일일합계가 없는 오래된/다른 형식 파일만
-         * 월간 플랫폼 합계로 fallback.
-         */
-        /*
-         * 수술 수는 일별 배열 재합산이 아니라
-         * Excel 월 합계 행의 확정값 사용.
-         */
-        const actualSurgeriesTotal =
-          item.actualSurgeries ?? 0;
-
         const totalApplications =
-          item.dailyTotalApplications !== null
-            ? item.dailyTotalApplications
+          dailyPlatforms.length > 0
+            ? dailyPlatforms.reduce(
+                (sum, row) =>
+                  sum + row.applications,
+                0
+              )
             : platforms.reduce(
                 (sum, row) =>
                   sum + row.applications,
@@ -1962,25 +1731,23 @@ export async function POST(request: NextRequest) {
               );
 
         const totalReservations =
-          item.dailyTotalReservations !== null
-            ? item.dailyTotalReservations
+          dailyPlatforms.length > 0
+            ? dailyPlatforms.reduce(
+                (sum, row) =>
+                  sum + row.reservations,
+                0
+              )
             : platforms.reduce(
                 (sum, row) =>
                   sum + row.reservations,
                 0
               );
 
-
         return {
           month: item.month,
           platforms,
           dailyPlatforms,
-          dailyTotalApplications:
-            item.dailyTotalApplications,
-          dailyTotalReservations:
-            item.dailyTotalReservations,
           dailyConversions,
-          actualSurgeries: actualSurgeriesTotal,
           doctorConversions,
           consultations: item.consultations,
           surgeries: item.surgeries,
@@ -2022,6 +1789,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 

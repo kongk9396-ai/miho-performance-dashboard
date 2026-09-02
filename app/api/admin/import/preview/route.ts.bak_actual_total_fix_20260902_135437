@@ -57,7 +57,6 @@ type SheetCandidate = {
   dailyTotalReservations: number | null;
   dailyConversions: DailyConversionRow[];
   doctorConversions: DoctorConversionRow[];
-  actualSurgeries: number | null;
   consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -73,7 +72,6 @@ type MonthAccumulator = {
   dailyTotalReservations: number | null;
 dailyConversionMap: Map<string, DailyConversionRow>;
     doctorMap: Map<string, DoctorConversionRow>;
-  actualSurgeries: number | null;
 consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -1375,9 +1373,6 @@ function parseDailyConversionLayout(
   const targetMonth =
     monthKey(month);
 
-  let sheetTotalActualSurgeries:
-    number | null = null;
-
   let sheetTotalConsultations:
     number | null = null;
 
@@ -1411,13 +1406,6 @@ function parseDailyConversionLayout(
       marker === "합계" ||
       marker === "총합"
     ) {
-      sheetTotalActualSurgeries =
-        intValue(
-          row[
-            actualSurgeryCol
-          ]
-        );
-
       sheetTotalConsultations =
         intValue(
           row[
@@ -1558,22 +1546,8 @@ function parseDailyConversionLayout(
       ? sheetTotalSurgeries
       : calculatedSurgeries;
 
-  const actualSurgeries =
-    sheetTotalActualSurgeries !== null
-      ? sheetTotalActualSurgeries
-      : dailyRows.reduce(
-          (sum, row) =>
-            sum + Number(row.actualSurgeries ?? 0),
-          0
-        );
-
   return {
     rows: dailyRows,
-
-    actualSurgeries:
-      dailyRows.length > 0
-        ? actualSurgeries
-        : null,
 
     consultations:
       dailyRows.length > 0
@@ -1722,8 +1696,6 @@ function parseSheet(
     dailyTotalReservations:
       dailyGrandTotal.reservations,
     dailyConversions: dailyConversion.rows,
-    actualSurgeries:
-      dailyConversion.actualSurgeries ?? null,
     doctorConversions,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,
@@ -1748,7 +1720,6 @@ function getAccumulator(
     dailyTotalReservations: null,
     dailyConversionMap: new Map(),
     doctorMap: new Map(),
-    actualSurgeries: null,
     consultations: null,
     surgeries: null,
     conversionScore: 0,
@@ -1832,11 +1803,6 @@ function mergeCandidate(
       row.doctorName,
       row
     );
-  }
-
-  if (candidate.actualSurgeries !== null) {
-    accumulator.actualSurgeries =
-      candidate.actualSurgeries;
   }
 
   if (candidate.conversionScore > accumulator.conversionScore) {
@@ -1945,12 +1911,15 @@ export async function POST(request: NextRequest) {
          * 일일합계가 없는 오래된/다른 형식 파일만
          * 월간 플랫폼 합계로 fallback.
          */
-        /*
-         * 수술 수는 일별 배열 재합산이 아니라
-         * Excel 월 합계 행의 확정값 사용.
-         */
         const actualSurgeriesTotal =
-          item.actualSurgeries ?? 0;
+          dailyConversions.reduce(
+            (sum, row) =>
+              sum +
+              Number(
+                row.actualSurgeries ?? 0
+              ),
+            0
+          );
 
         const totalApplications =
           item.dailyTotalApplications !== null
@@ -2022,6 +1991,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 

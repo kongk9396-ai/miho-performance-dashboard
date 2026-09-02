@@ -30,7 +30,6 @@ type ImportMonth = {
   }[];
   dailyConversions?: {
     date: string;
-    actualSurgeries: number;
     consultations: number;
     surgeries: number;
   }[];
@@ -411,40 +410,10 @@ export async function POST(request: NextRequest) {
           : [];
 
       if (incomingDailyConversions.length > 0) {
-
-        /*
-         * overwrite 모드에서는
-         * 해당 월의 기존 상담/수술전환 일별 데이터를
-         * 먼저 전부 삭제한다.
-         *
-         * 과거 잘못 파싱된 날짜/값이 남아서
-         * 월 합계에 섞이는 문제 방지.
-         */
-        if (mode === "overwrite") {
-          await db
-            .delete(dailyConversionStats)
-            .where(
-              and(
-                gte(
-                  dailyConversionStats.date,
-                  monthStart
-                ),
-                lt(
-                  dailyConversionStats.date,
-                  nextMonthStart
-                )
-              )
-            );
-        }
-
         const values =
           incomingDailyConversions.map(
             (row) => ({
               date: row.date,
-              actualSurgeries:
-                safeNumber(
-                  row.actualSurgeries
-                ),
               consultations:
                 safeNumber(row.consultations),
               surgeries:
@@ -459,8 +428,6 @@ export async function POST(request: NextRequest) {
             target:
               dailyConversionStats.date,
             set: {
-              actualSurgeries:
-                sql`excluded.actual_surgeries`,
               consultations:
                 sql`excluded.consultations`,
               surgeries:

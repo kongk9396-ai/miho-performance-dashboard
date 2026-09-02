@@ -73,7 +73,6 @@ type MonthAccumulator = {
   dailyTotalReservations: number | null;
 dailyConversionMap: Map<string, DailyConversionRow>;
     doctorMap: Map<string, DoctorConversionRow>;
-  actualSurgeries: number | null;
 consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -1722,8 +1721,6 @@ function parseSheet(
     dailyTotalReservations:
       dailyGrandTotal.reservations,
     dailyConversions: dailyConversion.rows,
-    actualSurgeries:
-      dailyConversion.actualSurgeries ?? null,
     doctorConversions,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,
@@ -2022,6 +2019,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 

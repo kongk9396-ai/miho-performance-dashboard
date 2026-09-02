@@ -50,7 +50,6 @@ type DashboardData = {
   totalVisitSourceCount: number;
   dailyConversions: {
     date: string;
-    actualSurgeries?: number;
     consultations: number;
     surgeries: number;
     rate: number;
@@ -1836,73 +1835,41 @@ const [
                   return (
                     <>
                       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                        
-<div className="rounded-2xl bg-zinc-50 p-5">
-  <p className="text-sm font-medium text-zinc-500">
-    수술 수
-  </p>
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            상담
+                          </p>
 
-  <div className="mt-2 flex items-end gap-1">
-    <strong className="text-3xl font-black text-zinc-950">
-      {rows
-        .reduce(
-          (sum, row) =>
-            sum + Number(row.actualSurgeries ?? 0),
-          0
-        )
-        .toLocaleString()}
-    </strong>
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {consultations.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
 
-    <span className="pb-1 text-sm text-zinc-400">
-      건
-    </span>
-  </div>
-</div>
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            수술 전환
+                          </p>
 
-<div className="rounded-2xl bg-zinc-50 p-5">
-  <p className="text-sm font-medium text-zinc-500">
-    상담 수
-  </p>
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {conversions.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
 
-  <div className="mt-2 flex items-end gap-1">
-    <strong className="text-3xl font-black text-zinc-950">
-      {current.consultations.toLocaleString()}
-    </strong>
+                        <div className="rounded-2xl bg-blue-50 p-5">
+                          <p className="text-xs font-bold text-blue-600">
+                            상담 → 수술 전환율
+                          </p>
 
-    <span className="pb-1 text-sm text-zinc-400">
-      건
-    </span>
-  </div>
-</div>
-
-<div className="rounded-2xl bg-zinc-50 p-5">
-  <p className="text-sm font-medium text-zinc-500">
-    수술 결정
-  </p>
-
-  <div className="mt-2 flex items-end gap-1">
-    <strong className="text-3xl font-black text-zinc-950">
-      {current.surgeries.toLocaleString()}
-    </strong>
-
-    <span className="pb-1 text-sm text-zinc-400">
-      건
-    </span>
-  </div>
-</div>
-
-<div className="rounded-2xl bg-zinc-50 p-5">
-  <p className="text-sm font-medium text-blue-600">
-    수술 전환율
-  </p>
-
-  <div className="mt-2">
-    <strong className="text-3xl font-black text-blue-600">
-      {current.surgeryRate.toFixed(2)}%
-    </strong>
-  </div>
-</div>
-
+                          <p className="mt-2 text-3xl font-black text-blue-700">
+                            {rate.toFixed(2)}%
+                          </p>
+                        </div>
                       </div>
 
                       <details className="group mt-5">
@@ -1920,10 +1887,9 @@ const [
                           <thead>
                             <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
                               <th className="px-3 py-3">일자</th>
-                              <th className="px-3 py-3 text-right">수술 수</th>
-<th className="px-3 py-3 text-right">상담 수</th>
-                              <th className="px-3 py-3 text-right">수술 결정</th>
-                              <th className="px-3 py-3 text-right">수술 전환율</th>
+                              <th className="px-3 py-3 text-right">상담</th>
+                              <th className="px-3 py-3 text-right">수술 전환</th>
+                              <th className="px-3 py-3 text-right">전환율</th>
                             </tr>
                           </thead>
 
@@ -1946,9 +1912,6 @@ const [
                                   </td>
 
                                   <td className="px-3 py-3 text-right font-bold">
-                                    {Number(row.actualSurgeries ?? 0).toLocaleString()}
-                                  </td>
-<td className="px-3 py-3 text-right font-bold">
                                     {row.consultations.toLocaleString()}
                                   </td>
 

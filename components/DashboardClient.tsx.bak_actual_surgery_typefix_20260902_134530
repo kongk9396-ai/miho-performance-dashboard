@@ -50,7 +50,6 @@ type DashboardData = {
   totalVisitSourceCount: number;
   dailyConversions: {
     date: string;
-    actualSurgeries?: number;
     consultations: number;
     surgeries: number;
     rate: number;
@@ -1946,7 +1945,7 @@ const [
                                   </td>
 
                                   <td className="px-3 py-3 text-right font-bold">
-                                    {Number(row.actualSurgeries ?? 0).toLocaleString()}
+                                    {row.actualSurgeries.toLocaleString()}
                                   </td>
 <td className="px-3 py-3 text-right font-bold">
                                     {row.consultations.toLocaleString()}

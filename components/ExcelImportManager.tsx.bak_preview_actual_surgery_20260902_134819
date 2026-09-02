@@ -21,7 +21,6 @@ type PreviewMonth = {
     applications: number;
     reservations: number;
   }[];
-  actualSurgeries: number;
 
   consultations: number | null;
   surgeries: number | null;
@@ -405,16 +404,13 @@ export default function ExcelImportManager() {
                       예약률
                     </th>
                     <th className="p-3 text-right">
-                      수술 수
-                    </th>
-<th className="p-3 text-right">
-                      상담 수
+                      상담
                     </th>
                     <th className="p-3 text-right">
-                      수술 결정
+                      수술
                     </th>
                     <th className="p-3 text-right">
-                      수술 전환율
+                      수술률
                     </th>
                     <th className="p-3">
                       플랫폼
@@ -469,9 +465,6 @@ export default function ExcelImportManager() {
                         </td>
 
                         <td className="p-3 text-right">
-                          {month.actualSurgeries?.toLocaleString?.() ?? month.actualSurgeries ?? 0}
-                        </td>
-<td className="p-3 text-right">
                           {month.consultations ??
                             "-"}
                         </td>
