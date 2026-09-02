@@ -412,6 +412,92 @@ export async function POST(request: NextRequest) {
 
       if (incomingDailyConversions.length > 0) {
 
+    /*
+     * Excel 상담 대비 수술 전환 표에서
+     * 월 합계와 일별 행 합계가 다른 경우가 있다.
+     *
+     * 특히 첫날 날짜 셀이 수식/병합 형태인 파일에서
+     * 첫날 값이 일별 파싱에서 누락될 수 있으므로,
+     * preview에서 확정된 월 합계와 일별 합계의 차이를
+     * 해당 월 첫 행에 보정한다.
+     */
+    const expectedConsultations =
+      safeNumber(monthData.consultations);
+
+    const expectedSurgeryDecisions =
+      safeNumber(monthData.surgeries);
+
+    const expectedActualSurgeries =
+      safeNumber(monthData.actualSurgeries);
+
+    const actualDailyConsultations =
+      incomingDailyConversions.reduce(
+        (sum, row) =>
+          sum + safeNumber(row.consultations),
+        0
+      );
+
+    const actualDailySurgeryDecisions =
+      incomingDailyConversions.reduce(
+        (sum, row) =>
+          sum + safeNumber(row.surgeries),
+        0
+      );
+
+    const actualDailyActualSurgeries =
+      incomingDailyConversions.reduce(
+        (sum, row) =>
+          sum + safeNumber(row.actualSurgeries),
+        0
+      );
+
+    const consultationDelta =
+      expectedConsultations -
+      actualDailyConsultations;
+
+    const surgeryDecisionDelta =
+      expectedSurgeryDecisions -
+      actualDailySurgeryDecisions;
+
+    const actualSurgeryDelta =
+      expectedActualSurgeries -
+      actualDailyActualSurgeries;
+
+    if (
+      incomingDailyConversions.length > 0 &&
+      (
+        consultationDelta !== 0 ||
+        surgeryDecisionDelta !== 0 ||
+        actualSurgeryDelta !== 0
+      )
+    ) {
+      const firstRow =
+        incomingDailyConversions[0];
+
+      firstRow.consultations =
+        safeNumber(firstRow.consultations) +
+        consultationDelta;
+
+      firstRow.surgeries =
+        safeNumber(firstRow.surgeries) +
+        surgeryDecisionDelta;
+
+      firstRow.actualSurgeries =
+        safeNumber(firstRow.actualSurgeries) +
+        actualSurgeryDelta;
+
+      console.log(
+        "[import] reconciled conversion totals",
+        {
+          month: monthData.month,
+          consultationDelta,
+          surgeryDecisionDelta,
+          actualSurgeryDelta,
+        }
+      );
+    }
+
+
         /*
          * overwrite 모드에서는
          * 해당 월의 기존 상담/수술전환 일별 데이터를
