@@ -917,6 +917,259 @@ function PlatformChart({
     </div>
   );
 }
+
+function PlatformDetailTable({
+  current,
+  previous,
+}: {
+  current: MonthData | null | undefined;
+  previous: MonthData | null | undefined;
+}) {
+  const normalizeName = (
+    value: string
+  ) =>
+    String(value ?? "")
+      .trim()
+      .replace(/\s+/g, "");
+
+  const currentRows =
+    current?.platformStats ?? [];
+
+  const previousRows =
+    previous?.platformStats ?? [];
+
+  const currentMap =
+    new Map(
+      currentRows.map(
+        (row) => [
+          normalizeName(row.name),
+          row,
+        ]
+      )
+    );
+
+  const previousMap =
+    new Map(
+      previousRows.map(
+        (row) => [
+          normalizeName(row.name),
+          row,
+        ]
+      )
+    );
+
+  const orderedNames =
+    Array.from(
+      new Set([
+        ...currentRows.map(
+          (row) =>
+            normalizeName(row.name)
+        ),
+        ...previousRows.map(
+          (row) =>
+            normalizeName(row.name)
+        ),
+      ])
+    );
+
+  const rows =
+    orderedNames.map(
+      (key) => {
+        const now =
+          currentMap.get(key);
+
+        const before =
+          previousMap.get(key);
+
+        const name =
+          now?.name ??
+          before?.name ??
+          key;
+
+        const currentApplications =
+          now?.applications ?? 0;
+
+        const previousApplications =
+          before?.applications ?? 0;
+
+        const currentReservations =
+          now?.reservations ?? 0;
+
+        const previousReservations =
+          before?.reservations ?? 0;
+
+        return {
+          name,
+
+          currentApplications,
+          previousApplications,
+
+          applicationDelta:
+            currentApplications -
+            previousApplications,
+
+          currentReservations,
+          previousReservations,
+
+          reservationDelta:
+            currentReservations -
+            previousReservations,
+
+          rate:
+            currentApplications > 0
+              ? (
+                  currentReservations /
+                  currentApplications
+                ) * 100
+              : 0,
+        };
+      }
+    );
+
+  const Delta = ({
+    value,
+  }: {
+    value: number;
+  }) => {
+    if (value > 0) {
+      return (
+        <span className="font-bold text-red-500">
+          ▲ {value.toLocaleString()}
+        </span>
+      );
+    }
+
+    if (value < 0) {
+      return (
+        <span className="font-bold text-blue-600">
+          ▼ {Math.abs(
+            value
+          ).toLocaleString()}
+        </span>
+      );
+    }
+
+    return (
+      <span className="font-semibold text-zinc-400">
+        -
+      </span>
+    );
+  };
+
+  return (
+    <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-zinc-950">
+          플랫폼별 상세 실적
+        </h2>
+
+        <p className="mt-1 text-sm text-zinc-500">
+          전월 대비 플랫폼별 신청 · 예약 실적
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-xl bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-400">
+          등록된 플랫폼 실적이 없습니다.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <tr className="border-y border-zinc-200 bg-zinc-50 text-zinc-600">
+                <th className="px-4 py-3 text-left font-semibold">
+                  플랫폼
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  전월 신청
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 신청
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  증감
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  전월 예약
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 예약
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  증감
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 전환율
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map(
+                (row) => (
+                  <tr
+                    key={row.name}
+                    className="border-b border-zinc-100 transition hover:bg-zinc-50"
+                  >
+                    <td className="px-4 py-4 font-bold text-zinc-900">
+                      {row.name}
+                    </td>
+
+                    <td className="px-4 py-4 text-right text-zinc-500">
+                      {row.previousApplications.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-zinc-950">
+                      {row.currentApplications.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right">
+                      <Delta
+                        value={
+                          row.applicationDelta
+                        }
+                      />
+                    </td>
+
+                    <td className="px-4 py-4 text-right text-zinc-500">
+                      {row.previousReservations.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-zinc-950">
+                      {row.currentReservations.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right">
+                      <Delta
+                        value={
+                          row.reservationDelta
+                        }
+                      />
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-blue-600">
+                      {row.rate.toFixed(
+                        1
+                      )}
+                      %
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
 export default function DashboardClient({
   data,
   availableMonths,
@@ -924,10 +1177,7 @@ export default function DashboardClient({
   data: DashboardData;
   availableMonths: string[];
 }) {
-  const [selectedCategoryTrend, setSelectedCategoryTrend] =
-    useState("코");
-
-  const [
+const [
     dashboardData,
     setDashboardData,
   ] = useState<DashboardData>(
@@ -1765,183 +2015,65 @@ export default function DashboardClient({
                 </div>
               </article>
             </section>
-<section className="mt-6">
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold">
-                      카테고리별 상담 · 수술
-                    </h2>
-
-                    <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 기준 · 코 / 눈 / 리프팅 / 쁘띠
-                    </p>
-                  </div>
-
-                  <a
-                    href="/admin/category-conversion"
-                    className="text-xs font-bold text-blue-600 hover:text-blue-700"
-                  >
-                    입력하기 →
-                  </a>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {(dashboardData.categoryConversions ?? []).map(
-                    (row) => (
-                      <div
-                        key={row.category}
-                        className="rounded-2xl border border-zinc-100 bg-zinc-50 p-5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-black text-zinc-900">
-                            {row.category}
-                          </h3>
-
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
-                            {row.rate.toFixed(1)}%
-                          </span>
-                        </div>
-
-                        <div className="mt-5 grid grid-cols-2 gap-3">
-                          <div className="rounded-xl bg-white p-3">
-                            <p className="text-xs font-semibold text-zinc-500">
-                              상담
-                            </p>
-
-                            <p className="mt-1 text-xl font-black text-zinc-900">
-                              {row.consultations.toLocaleString()}
-                              <span className="ml-1 text-xs font-semibold text-zinc-400">
-                                건
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="rounded-xl bg-white p-3">
-                            <p className="text-xs font-semibold text-zinc-500">
-                              수술
-                            </p>
-
-                            <p className="mt-1 text-xl font-black text-zinc-900">
-                              {row.surgeries.toLocaleString()}
-                              <span className="ml-1 text-xs font-semibold text-zinc-400">
-                                건
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3">
-                          <div className="mb-2 flex justify-between text-xs">
-                            <span className="font-semibold text-zinc-500">
-                              상담 대비 수술
-                            </span>
-
-                            <strong className="text-blue-700">
-                              {row.rate.toFixed(1)}%
-                            </strong>
-                          </div>
-
-                          <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
-                            <div
-                              className="h-full rounded-full bg-blue-600"
-                              style={{
-                                width: `${Math.min(
-                                  row.rate,
-                                  100
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              </article>
-            </section>
-            {/* CATEGORY_DAILY_TREND_SECTION */}
             <section className="mt-6">
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-black text-zinc-900">
-                      카테고리 일별 추이
+                      상담 대비 수술 전환
                     </h2>
 
                     <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 기준 일자별 상담 · 수술 변화
+                      선택 월 기준 · 일별 상담 및 수술결정 집계
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {["코", "눈", "리프팅", "쁘띠"].map(
-                      (category) => (
-                        <button
-                          key={category}
-                          type="button"
-                          onClick={() =>
-                            setSelectedCategoryTrend(
-                              category
-                            )
-                          }
-                          className={
-                            selectedCategoryTrend ===
-                            category
-                              ? "rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white"
-                              : "rounded-xl bg-zinc-100 px-4 py-2 text-sm font-bold text-zinc-500 hover:bg-zinc-200"
-                          }
-                        >
-                          {category}
-                        </button>
-                      )
-                    )}
-                  </div>
+                  <a
+                    href="/admin/import"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  >
+                    엑셀 일괄 업로드 →
+                  </a>
                 </div>
 
                 {(() => {
                   const rows =
-                    (
-                      dashboardData.dailyCategoryConversions ??
-                      []
-                    ).filter(
-                      (row) =>
-                        row.category ===
-                        selectedCategoryTrend
-                    );
+                    dashboardData.dailyConversions ?? [];
 
                   const consultations =
-                    rows.reduce(
-                      (sum, row) =>
-                        sum +
-                        row.consultations,
-                      0
-                    );
+                    rows.length > 0
+                      ? rows.reduce(
+                          (sum, row) =>
+                            sum + row.consultations,
+                          0
+                        )
+                      : current.consultations;
 
-                  const surgeries =
-                    rows.reduce(
-                      (sum, row) =>
-                        sum +
-                        row.surgeries,
-                      0
-                    );
+                  const conversions =
+                    rows.length > 0
+                      ? rows.reduce(
+                          (sum, row) =>
+                            sum + row.surgeries,
+                          0
+                        )
+                      : current.surgeries;
 
                   const rate =
                     consultations > 0
-                      ? (surgeries /
+                      ? (conversions /
                           consultations) *
                         100
                       : 0;
 
                   return (
                     <>
-                      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-zinc-500">
-                            {selectedCategoryTrend} 상담
+                      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            상담
                           </p>
 
-                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
                             {consultations.toLocaleString()}
                             <span className="ml-1 text-sm font-semibold text-zinc-400">
                               건
@@ -1949,34 +2081,81 @@ export default function DashboardClient({
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-zinc-500">
-                            {selectedCategoryTrend} 수술
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            수술 전환
                           </p>
 
-                          <p className="mt-1 text-2xl font-black text-zinc-900">
-                            {surgeries.toLocaleString()}
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {conversions.toLocaleString()}
                             <span className="ml-1 text-sm font-semibold text-zinc-400">
                               건
                             </span>
                           </p>
                         </div>
 
-                        <div className="rounded-xl bg-blue-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-blue-600">
-                            상담 대비 수술 비율
+                        <div className="rounded-2xl bg-blue-50 p-5">
+                          <p className="text-xs font-bold text-blue-600">
+                            상담 → 수술 전환율
                           </p>
 
-                          <p className="mt-1 text-2xl font-black text-blue-700">
-                            {rate.toFixed(1)}%
+                          <p className="mt-2 text-3xl font-black text-blue-700">
+                            {rate.toFixed(2)}%
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-7">
-                        <CategoryTrendChart
-                          rows={rows}
-                        />
+                      <div className="mt-6 overflow-x-auto">
+                        <table className="w-full min-w-[560px] border-collapse">
+                          <thead>
+                            <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
+                              <th className="px-3 py-3">일자</th>
+                              <th className="px-3 py-3 text-right">상담</th>
+                              <th className="px-3 py-3 text-right">수술 전환</th>
+                              <th className="px-3 py-3 text-right">전환율</th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {rows.map((row) => {
+                              const rowRate =
+                                row.consultations > 0
+                                  ? (row.surgeries /
+                                      row.consultations) *
+                                    100
+                                  : 0;
+
+                              return (
+                                <tr
+                                  key={row.date}
+                                  className="border-b border-zinc-100 text-sm"
+                                >
+                                  <td className="px-3 py-3 font-semibold text-zinc-700">
+                                    {row.date.slice(5)}
+                                  </td>
+
+                                  <td className="px-3 py-3 text-right font-bold">
+                                    {row.consultations.toLocaleString()}
+                                  </td>
+
+                                  <td className="px-3 py-3 text-right font-bold">
+                                    {row.surgeries.toLocaleString()}
+                                  </td>
+
+                                  <td className="px-3 py-3 text-right font-black text-blue-600">
+                                    {rowRate.toFixed(2)}%
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+
+                        {rows.length === 0 && (
+                          <div className="py-10 text-center text-sm text-zinc-400">
+                            일별 상담/수술전환 데이터가 없습니다.
+                          </div>
+                        )}
                       </div>
                     </>
                   );
@@ -1986,6 +2165,14 @@ export default function DashboardClient({
 
 
             <section className="mt-6">
+              <PlatformDetailTable
+                current={current}
+                previous={previous}
+              />
+            </section>
+
+            
+<section className="mt-6">
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-bold">
                   플랫폼별 예약 전환율 비교

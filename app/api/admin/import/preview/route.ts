@@ -19,10 +19,17 @@ type DailyPlatformRow = {
   reservations: number;
 };
 
+type DailyConversionRow = {
+  date: string;
+  consultations: number;
+  surgeries: number;
+};
+
 type MonthPreview = {
   month: string;
   platforms: PlatformRow[];
   dailyPlatforms: DailyPlatformRow[];
+  dailyConversions: DailyConversionRow[];
   consultations: number | null;
   surgeries: number | null;
   sources: string[];
@@ -34,6 +41,7 @@ type SheetCandidate = {
   monthlyPlatforms: PlatformRow[];
   monthlyPlatformScore: number;
   dailyPlatforms: DailyPlatformRow[];
+  dailyConversions: DailyConversionRow[];
   consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -45,6 +53,7 @@ type MonthAccumulator = {
   platformMap: Map<string, PlatformRow>;
   platformScore: number;
   dailyMap: Map<string, DailyPlatformRow>;
+  dailyConversionMap: Map<string, DailyConversionRow>;
   consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -548,6 +557,145 @@ function parseComparisonPlatformLayout(rows: unknown[][]) {
   };
 }
 
+
+function parseDailyConversionLayout(
+  rows: unknown[][],
+  month: string
+) {
+  const result: DailyConversionRow[] = [];
+
+  let headerRow = -1;
+  let dateCol = -1;
+  let consultationCol = -1;
+  let conversionCol = -1;
+
+  for (let r = 0; r < Math.min(rows.length, 100); r++) {
+    const row = rows[r] ?? [];
+
+    let foundDate = -1;
+    let foundConsult = -1;
+    let foundConversion = -1;
+
+    for (let c = 0; c < row.length; c++) {
+      const cell = compactText(row[c]);
+
+      if (
+        cell === "일자" ||
+        cell === "날짜"
+      ) {
+        foundDate = c;
+      }
+
+      if (
+        cell === "상담" ||
+        cell === "상담수" ||
+        cell === "상담건수" ||
+        cell === "실상담"
+      ) {
+        foundConsult = c;
+      }
+
+      if (
+        cell === "수술전환" ||
+        cell === "수술전환수" ||
+        cell === "수술결정" ||
+        cell === "수술결정수"
+      ) {
+        foundConversion = c;
+      }
+    }
+
+    if (
+      foundDate >= 0 &&
+      foundConsult >= 0 &&
+      foundConversion >= 0
+    ) {
+      headerRow = r;
+      dateCol = foundDate;
+      consultationCol = foundConsult;
+      conversionCol = foundConversion;
+      break;
+    }
+  }
+
+  if (
+    headerRow < 0 ||
+    dateCol < 0 ||
+    consultationCol < 0 ||
+    conversionCol < 0
+  ) {
+    return {
+      rows: result,
+      consultations: null as number | null,
+      surgeries: null as number | null,
+      score: 0,
+    };
+  }
+
+  for (let r = headerRow + 1; r < rows.length; r++) {
+    const row = rows[r] ?? [];
+
+    const rawDate = row[dateCol];
+
+    if (
+      compactText(rawDate) === "합계" ||
+      compactText(rawDate) === "총합"
+    ) {
+      break;
+    }
+
+    const date = toDateString(rawDate, month);
+
+    if (!date || monthKey(date) !== monthKey(month)) {
+      continue;
+    }
+
+    const consultations = intValue(row[consultationCol]);
+    const surgeries = intValue(row[conversionCol]);
+
+    if (
+      consultations === null &&
+      surgeries === null
+    ) {
+      continue;
+    }
+
+    result.push({
+      date,
+      consultations: consultations ?? 0,
+      surgeries: surgeries ?? 0,
+    });
+  }
+
+  const totalConsultations =
+    result.reduce(
+      (sum, row) => sum + row.consultations,
+      0
+    );
+
+  const totalSurgeries =
+    result.reduce(
+      (sum, row) => sum + row.surgeries,
+      0
+    );
+
+  return {
+    rows: result,
+    consultations:
+      result.length > 0
+        ? totalConsultations
+        : null,
+    surgeries:
+      result.length > 0
+        ? totalSurgeries
+        : null,
+    score:
+      result.length > 0
+        ? 1200 + result.length
+        : 0,
+  };
+}
+
 function parseMonthlyConversionLayout(rows: unknown[][]) {
   let consultations: number | null = null;
   let surgeries: number | null = null;
@@ -624,10 +772,24 @@ function parseSheet(
   }
 
   const conversion = parseMonthlyConversionLayout(rows);
+  const dailyConversion =
+    parseDailyConversionLayout(rows, month);
+
+  if (
+    dailyConversion.score > conversion.score
+  ) {
+    conversion.consultations =
+      dailyConversion.consultations;
+    conversion.surgeries =
+      dailyConversion.surgeries;
+    conversion.score =
+      dailyConversion.score;
+  }
 
   if (
     monthlyPlatforms.length === 0 &&
     dailyLayout.dailyPlatforms.length === 0 &&
+    dailyConversion.rows.length === 0 &&
     conversion.score === 0
   ) {
     return null;
@@ -642,6 +804,7 @@ function parseSheet(
     monthlyPlatforms,
     monthlyPlatformScore,
     dailyPlatforms: dailyLayout.dailyPlatforms,
+    dailyConversions: dailyConversion.rows,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,
     conversionScore: conversion.score,
@@ -661,6 +824,7 @@ function getAccumulator(
     platformMap: new Map(),
     platformScore: 0,
     dailyMap: new Map(),
+    dailyConversionMap: new Map(),
     consultations: null,
     surgeries: null,
     conversionScore: 0,
@@ -709,6 +873,13 @@ function mergeCandidate(
     }
 
     accumulator.dailyMap.set(key, row);
+  }
+
+  for (const row of candidate.dailyConversions ?? []) {
+    accumulator.dailyConversionMap.set(
+      row.date,
+      row
+    );
   }
 
   if (candidate.conversionScore > accumulator.conversionScore) {
@@ -783,6 +954,14 @@ export async function POST(request: NextRequest) {
             : a.date.localeCompare(b.date)
         );
 
+        const dailyConversions =
+          Array.from(
+            item.dailyConversionMap.values()
+          ).sort(
+            (a, b) =>
+              a.date.localeCompare(b.date)
+          );
+
         const totalApplications = platforms.reduce(
           (sum, row) => sum + row.applications,
           0
@@ -796,6 +975,7 @@ export async function POST(request: NextRequest) {
           month: item.month,
           platforms,
           dailyPlatforms,
+          dailyConversions,
           consultations: item.consultations,
           surgeries: item.surgeries,
           sources: Array.from(item.sources),

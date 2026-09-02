@@ -4,6 +4,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   dailyPlatformStats,
+  dailyConversionStats,
   monthlyConversionStats,
   monthlyPlatformStats,
   platforms,
@@ -25,6 +26,11 @@ type ImportMonth = {
     platform: string;
     applications: number;
     reservations: number;
+  }[];
+  dailyConversions?: {
+    date: string;
+    consultations: number;
+    surgeries: number;
   }[];
   consultations: number | null;
   surgeries: number | null;
@@ -138,6 +144,7 @@ export async function POST(request: NextRequest) {
     let skippedMonths = 0;
     let monthlyRowsSaved = 0;
     let dailyRowsSaved = 0;
+    let dailyConversionRowsSaved = 0;
     let conversionMonthsSaved = 0;
     let preservedDatasets = 0;
 
@@ -378,6 +385,54 @@ export async function POST(request: NextRequest) {
         preservedDatasets++;
       }
 
+
+      /*
+       * 일별 상담 / 수술전환 일괄 저장
+       */
+      const incomingDailyConversions =
+        Array.isArray(monthData.dailyConversions)
+          ? monthData.dailyConversions.filter(
+              (row) =>
+                isValidDate(row.date) &&
+                row.date >= monthStart &&
+                row.date < nextMonthStart
+            )
+          : [];
+
+      if (incomingDailyConversions.length > 0) {
+        const values =
+          incomingDailyConversions.map(
+            (row) => ({
+              date: row.date,
+              consultations:
+                safeNumber(row.consultations),
+              surgeries:
+                safeNumber(row.surgeries),
+            })
+          );
+
+        await db
+          .insert(dailyConversionStats)
+          .values(values)
+          .onConflictDoUpdate({
+            target:
+              dailyConversionStats.date,
+            set: {
+              consultations:
+                sql`excluded.consultations`,
+              surgeries:
+                sql`excluded.surgeries`,
+              updatedAt:
+                new Date(),
+            },
+          });
+
+        dailyConversionRowsSaved +=
+          values.length;
+
+        wroteSomething = true;
+      }
+
       const shouldWriteConversion =
         hasIncomingConversion &&
         (mode === "overwrite" || existingConversion.length === 0);
@@ -421,6 +476,7 @@ export async function POST(request: NextRequest) {
       skippedMonths,
       monthlyRowsSaved,
       dailyRowsSaved,
+      dailyConversionRowsSaved,
       conversionMonthsSaved,
       preservedDatasets,
     });
