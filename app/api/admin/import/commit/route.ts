@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 type ImportMonth = {
   month: string;
+  actualSurgeries?: number;
   platforms?: {
     platform: string;
     applications: number;

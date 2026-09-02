@@ -1,4 +1,6 @@
-﻿"use client";
+"use client";
+
+import Holidays from "date-holidays";
 
 import {
   useCallback,
@@ -20,6 +22,57 @@ type DoctorRow = {
   consultations: number;
   surgeries: number;
 };
+
+
+const krHolidays = new Holidays("KR");
+const holidayCache = new Map<number, Set<string>>();
+
+function toYmd(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getHolidaySet(year: number) {
+  const cached = holidayCache.get(year);
+
+  if (cached) {
+    return cached;
+  }
+
+  const holidaySet = new Set(
+    krHolidays
+      .getHolidays(year)
+      .filter(
+        (holiday) =>
+          holiday.type === "public" &&
+          holiday.substitute !== true &&
+          !/대체|substitute/i.test(
+            String(holiday.name ?? "")
+          )
+      )
+      .map((holiday) => {
+        const date = new Date(holiday.date);
+        return toYmd(date);
+      })
+  );
+
+  holidayCache.set(year, holidaySet);
+
+  return holidaySet;
+}
+
+function isSundayOrKrHoliday(dateString: string) {
+  const date = new Date(`${dateString}T12:00:00+09:00`);
+  const isSunday = date.getDay() === 0;
+
+  return (
+    isSunday ||
+    getHolidaySet(date.getFullYear()).has(dateString)
+  );
+}
 
 const DOCTORS = [
   "S",
@@ -87,29 +140,40 @@ function createDailyRows(
       const existingRow =
         map.get(date);
 
+      const isHoliday =
+        isSundayOrKrHoliday(
+          date
+        );
+
       return {
         date,
 
         actualSurgeries:
-          Number(
-            existingRow
-              ?.actualSurgeries ??
-              0
-          ),
+          isHoliday
+            ? 0
+            : Number(
+                existingRow
+                  ?.actualSurgeries ??
+                  0
+              ),
 
         consultations:
-          Number(
-            existingRow
-              ?.consultations ??
-              0
-          ),
+          isHoliday
+            ? 0
+            : Number(
+                existingRow
+                  ?.consultations ??
+                  0
+              ),
 
         surgeries:
-          Number(
-            existingRow
-              ?.surgeries ??
-              0
-          ),
+          isHoliday
+            ? 0
+            : Number(
+                existingRow
+                  ?.surgeries ??
+                  0
+              ),
       };
     }
   );
@@ -180,15 +244,18 @@ function rate(
 function NumberInput({
   value,
   onChange,
+  disabled = false,
 }: {
   value: number;
   onChange:
     (value: number) => void;
+  disabled?: boolean;
 }) {
   return (
     <input
       type="number"
       min={0}
+      disabled={disabled}
       value={
         value === 0
           ? ""
@@ -222,6 +289,9 @@ function NumberInput({
         focus:border-blue-500
         focus:ring-2
         focus:ring-blue-100
+        disabled:cursor-not-allowed
+        disabled:bg-zinc-100
+        disabled:text-zinc-400
       "
     />
   );
@@ -437,7 +507,21 @@ export default function ManualConversionManager() {
                 month,
                 section:
                   "daily",
-                daily,
+
+                daily:
+                  daily.map(
+                    (row) =>
+                      isSundayOrKrHoliday(
+                        row.date
+                      )
+                        ? {
+                            ...row,
+                            actualSurgeries: 0,
+                            consultations: 0,
+                            surgeries: 0,
+                          }
+                        : row
+                  ),
               }),
           }
         );
@@ -731,6 +815,11 @@ export default function ManualConversionManager() {
                   row,
                   index
                 ) => {
+                  const isHolidayRow =
+                    isSundayOrKrHoliday(
+                      row.date
+                    );
+
                   const rowRate =
                     rate(
                       row.surgeries,
@@ -742,13 +831,19 @@ export default function ManualConversionManager() {
                       key={
                         row.date
                       }
-                      className="
-                        border-b
-                        border-zinc-100
-                        hover:bg-zinc-50
-                      "
+                      className={
+                        isHolidayRow
+                          ? "border-b border-zinc-100 bg-zinc-100"
+                          : "border-b border-zinc-100 bg-white hover:bg-zinc-50"
+                      }
                     >
-                      <td className="px-4 py-2.5 text-sm font-bold text-zinc-700">
+                      <td
+                        className={
+                          isHolidayRow
+                            ? "px-4 py-2.5 text-sm font-bold text-zinc-400"
+                            : "px-4 py-2.5 text-sm font-bold text-zinc-700"
+                        }
+                      >
                         {row.date}
                       </td>
 
@@ -756,6 +851,9 @@ export default function ManualConversionManager() {
                         <NumberInput
                           value={
                             row.actualSurgeries
+                          }
+                          disabled={
+                            isHolidayRow
                           }
                           onChange={(
                             value
@@ -788,6 +886,9 @@ export default function ManualConversionManager() {
                           value={
                             row.consultations
                           }
+                          disabled={
+                            isHolidayRow
+                          }
                           onChange={(
                             value
                           ) => {
@@ -818,6 +919,9 @@ export default function ManualConversionManager() {
                         <NumberInput
                           value={
                             row.surgeries
+                          }
+                          disabled={
+                            isHolidayRow
                           }
                           onChange={(
                             value
@@ -1099,3 +1203,4 @@ export default function ManualConversionManager() {
     </div>
   );
 }
+
