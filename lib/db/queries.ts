@@ -12,6 +12,7 @@ import { db } from "./index";
 import {
   dailyCategoryConversionStats,
   dailyConversionStats,
+  doctorConversionStats,
   dailyPlatformStats,
   dailyVisitSources,
   monthlyConversionStats,
@@ -433,6 +434,7 @@ export async function getDashboardData(
     rawDailyRows,
     conversionRows,
     dailyConversionRows,
+    doctorConversionRows,
     categoryConversionRows,
     visitSourceRows,
   ] =
@@ -604,6 +606,35 @@ export async function getDashboardData(
         .orderBy(
           asc(dailyConversionStats.date)
         ),
+
+      /*
+       * 원장별 일별 상담 / 수술 전환
+       */
+      db
+        .select({
+          date: doctorConversionStats.date,
+          doctorName: doctorConversionStats.doctorName,
+          reservations: doctorConversionStats.reservations,
+          consultations: doctorConversionStats.consultations,
+          surgeries: doctorConversionStats.surgeries,
+        })
+        .from(doctorConversionStats)
+        .where(
+          and(
+            gte(
+              doctorConversionStats.date,
+              queryStartDate
+            ),
+            lt(
+              doctorConversionStats.date,
+              queryNextDate
+            )
+          )
+        )
+        .orderBy(
+          asc(doctorConversionStats.date)
+        ),
+
       db
         .select({
           date: dailyCategoryConversionStats.date,
@@ -895,10 +926,6 @@ export async function getDashboardData(
     );
   const dailyConversions =
     dailyConversionRows
-      .filter(
-        (row) =>
-          monthFromDate(row.date) === month
-      )
       .map((row) => ({
         date: row.date,
         consultations: row.consultations,
@@ -911,6 +938,109 @@ export async function getDashboardData(
       .sort((a, b) =>
         a.date.localeCompare(b.date)
       );
+
+  /*
+   * ========================================
+   * 원장별 상담 / 수술 전환
+   * ========================================
+   */
+
+  const doctorDailyConversions =
+    doctorConversionRows
+      .map((row) => {
+        const reservationRate =
+          row.reservations > 0
+            ? (row.surgeries /
+                row.reservations) *
+              100
+            : 0;
+
+        const consultationRate =
+          row.consultations > 0
+            ? (row.surgeries /
+                row.consultations) *
+              100
+            : 0;
+
+        return {
+          date: row.date,
+          doctorName: row.doctorName,
+          reservations: row.reservations,
+          consultations: row.consultations,
+          surgeries: row.surgeries,
+          reservationRate,
+          consultationRate,
+        };
+      })
+      .sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+
+
+  const doctorMap =
+    new Map<
+      string,
+      {
+        doctorName: string;
+        reservations: number;
+        consultations: number;
+        surgeries: number;
+      }
+    >();
+
+  for (const row of doctorDailyConversions) {
+    const current =
+      doctorMap.get(row.doctorName) ?? {
+        doctorName: row.doctorName,
+        reservations: 0,
+        consultations: 0,
+        surgeries: 0,
+      };
+
+    current.reservations +=
+      row.reservations;
+
+    current.consultations +=
+      row.consultations;
+
+    current.surgeries +=
+      row.surgeries;
+
+    doctorMap.set(
+      row.doctorName,
+      current
+    );
+  }
+
+
+  const doctorConversions =
+    Array.from(
+      doctorMap.values()
+    )
+      .map((row) => ({
+        ...row,
+
+        reservationRate:
+          row.reservations > 0
+            ? (row.surgeries /
+                row.reservations) *
+              100
+            : 0,
+
+        consultationRate:
+          row.consultations > 0
+            ? (row.surgeries /
+                row.consultations) *
+              100
+            : 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.consultationRate -
+          a.consultationRate
+      );
+
+
   const categoryNames = [
     "코",
     "눈",
@@ -1009,6 +1139,8 @@ export async function getDashboardData(
     monthlyVisitSources,
     totalVisitSourceCount,
     dailyConversions,
+    doctorConversions,
+    doctorDailyConversions,
     categoryConversions,
     previousCategoryConversions,
     dailyCategoryConversions,

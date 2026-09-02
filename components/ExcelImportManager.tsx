@@ -50,6 +50,33 @@ function formatPercent(
   return `${value.toFixed(2)}%`;
 }
 
+
+async function uploadConversionExcel(
+  file: File
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(
+    "/api/admin/conversion-excel",
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(
+      result.error ??
+        "상담/수술 전환 데이터 업로드 실패"
+    );
+  }
+
+  return result;
+}
+
 export default function ExcelImportManager() {
   const [files, setFiles] =
     useState<File[]>([]);

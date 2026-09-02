@@ -55,6 +55,26 @@ type DashboardData = {
     rate: number;
   }[];
 
+
+  doctorConversions: {
+    doctorName: string;
+    reservations: number;
+    consultations: number;
+    surgeries: number;
+    reservationRate: number;
+    consultationRate: number;
+  }[];
+
+  doctorDailyConversions: {
+    date: string;
+    doctorName: string;
+    reservations: number;
+    consultations: number;
+    surgeries: number;
+    reservationRate: number;
+    consultationRate: number;
+  }[];
+
   categoryConversions: {
     category: string;
     consultations: number;
@@ -1758,263 +1778,6 @@ const [
 
             {/* 월별 추이 / 플랫폼 */}
 
-            <section className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  월별 신청 · 예약 추이
-                </h2>
-
-                <p className="mt-1 text-sm text-zinc-500">
-                  선택한 월 기준 최근 12개월
-                </p>
-
-                <TrendChart
-                  data={
-                    dashboardData.monthlyTrend
-                  }
-                />
-
-                {(() => {
-                  const rows =
-                    dashboardData.dailyConversions ?? [];
-
-                  const dailyConsultations =
-                    rows.reduce(
-                      (sum, row) =>
-                        sum + row.consultations,
-                      0
-                    );
-
-                  const dailySurgeries =
-                    rows.reduce(
-                      (sum, row) =>
-                        sum + row.surgeries,
-                      0
-                    );
-
-                  const hasDailyConversionData =
-                    rows.length > 0;
-
-                  const totalConsultations =
-                    hasDailyConversionData
-                      ? dailyConsultations
-                      : dashboardData.current?.consultations ?? 0;
-
-                  const totalSurgeries =
-                    hasDailyConversionData
-                      ? dailySurgeries
-                      : dashboardData.current?.surgeries ?? 0;
-
-                  const totalRate =
-                    totalConsultations > 0
-                      ? (totalSurgeries /
-                          totalConsultations) *
-                        100
-                      : 0;
-
-                  return (
-                    <div className="mt-8 border-t border-zinc-100 pt-6">
-                      <div className="flex flex-wrap items-end justify-between gap-3">
-                        <div>
-                          <h3 className="font-black text-zinc-900">
-                            일별 상담 · 수술 현황
-                          </h3>
-
-                          <p className="mt-1 text-xs text-zinc-500">
-                            선택 월 기준 상담량 대비 수술량
-                          </p>
-                        </div>
-
-                        <a
-                          href="/admin/conversion"
-                          className="text-xs font-bold text-blue-600 hover:text-blue-700"
-                        >
-                          입력하기 →
-                        </a>
-                      </div>
-
-                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-zinc-500">
-                            월 상담
-                          </p>
-
-                          <p className="mt-1 text-2xl font-black text-zinc-900">
-                            {totalConsultations.toLocaleString()}
-                            <span className="ml-1 text-sm text-zinc-400">
-                              건
-                            </span>
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-zinc-500">
-                            월 수술
-                          </p>
-
-                          <p className="mt-1 text-2xl font-black text-zinc-900">
-                            {totalSurgeries.toLocaleString()}
-                            <span className="ml-1 text-sm text-zinc-400">
-                              건
-                            </span>
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-blue-50 px-4 py-4">
-                          <p className="text-xs font-semibold text-blue-600">
-                            상담 대비 수술 비율
-                          </p>
-
-                          <p className="mt-1 text-2xl font-black text-blue-700">
-                            {totalRate.toFixed(1)}%
-                          </p>
-                        </div>
-                      </div>
-
-                      {rows.length > 0 ? (
-                        <div className="mt-5 max-h-[330px] overflow-auto rounded-xl border border-zinc-100">
-                          <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-zinc-50 text-xs text-zinc-500">
-                              <tr>
-                                <th className="px-4 py-3 text-left font-bold">
-                                  날짜
-                                </th>
-
-                                <th className="px-4 py-3 text-right font-bold">
-                                  상담
-                                </th>
-
-                                <th className="px-4 py-3 text-right font-bold">
-                                  수술
-                                </th>
-
-                                <th className="px-4 py-3 text-right font-bold">
-                                  비율
-                                </th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {rows
-                                .slice()
-                                .sort(
-                                  (a, b) =>
-                                    b.date.localeCompare(
-                                      a.date
-                                    )
-                                )
-                                .map((row) => (
-                                  <tr
-                                    key={row.date}
-                                    className="border-t border-zinc-100"
-                                  >
-                                    <td className="px-4 py-3 font-semibold text-zinc-700">
-                                      {`${Number(
-                                        row.date.slice(5, 7)
-                                      )}/${Number(
-                                        row.date.slice(8, 10)
-                                      )}`}
-                                    </td>
-
-                                    <td className="px-4 py-3 text-right font-bold text-zinc-800">
-                                      {row.consultations}
-                                    </td>
-
-                                    <td className="px-4 py-3 text-right font-bold text-zinc-800">
-                                      {row.surgeries}
-                                    </td>
-
-                                    <td className="px-4 py-3 text-right font-black text-blue-700">
-                                      {row.rate.toFixed(1)}%
-                                    </td>
-                                  </tr>
-                                ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="mt-5 rounded-xl bg-zinc-50 px-5 py-8 text-center text-sm text-zinc-400">
-                          아직 입력된 상담·수술 데이터가 없습니다.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </article>
-            
-
-              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold">
-                      월별 내원 경로
-                    </h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      선택 월 실제 내원 기준
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-xs text-zinc-400">
-                      총 내원
-                    </p>
-                    <p className="mt-1 text-2xl font-black text-zinc-950">
-                      {dashboardData.totalVisitSourceCount.toLocaleString()}
-                      <span className="ml-1 text-sm font-semibold text-zinc-400">
-                        명
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 space-y-4">
-                  {dashboardData.monthlyVisitSources.length > 0 ? (
-                    dashboardData.monthlyVisitSources.map((row) => {
-                      const rate =
-                        dashboardData.totalVisitSourceCount > 0
-                          ? (row.count /
-                              dashboardData.totalVisitSourceCount) *
-                            100
-                          : 0;
-
-                      return (
-                        <div key={row.source}>
-                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                            <span className="font-semibold text-zinc-700">
-                              {row.source}
-                            </span>
-
-                            <span className="whitespace-nowrap text-zinc-500">
-                              <strong className="text-zinc-900">
-                                {row.count.toLocaleString()}명
-                              </strong>
-                              {" · "}
-                              {rate.toFixed(1)}%
-                            </span>
-                          </div>
-
-                          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
-                            <div
-                              className="h-full rounded-full bg-blue-600"
-                              style={{
-                                width: `${Math.max(
-                                  rate,
-                                  rate > 0 ? 2 : 0
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
-                      등록된 내원 경로 데이터가 없습니다.
-                    </div>
-                  )}
-                </div>
-              </article>
-            </section>
             <section className="mt-6">
               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -2038,7 +1801,11 @@ const [
 
                 {(() => {
                   const rows =
-                    dashboardData.dailyConversions ?? [];
+                    (dashboardData.dailyConversions ?? []).filter(
+                      (row) =>
+                        String(row.date).slice(0, 7) ===
+                        String(dashboardData.selectedMonth).slice(0, 7)
+                    );
 
                   const consultations =
                     rows.length > 0
@@ -2105,8 +1872,18 @@ const [
                         </div>
                       </div>
 
-                      <div className="mt-6 overflow-x-auto">
-                        <table className="w-full min-w-[560px] border-collapse">
+                      <details className="group mt-5">
+                        <summary className="flex cursor-pointer list-none items-center justify-end rounded-lg px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50">
+                          <span className="group-open:hidden">
+                            상세보기 ▼
+                          </span>
+                          <span className="hidden group-open:inline">
+                            접기 ▲
+                          </span>
+                        </summary>
+
+                        <div className="mt-3 overflow-x-auto">
+                          <table className="w-full min-w-[560px] border-collapse">
                           <thead>
                             <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
                               <th className="px-3 py-3">일자</th>
@@ -2156,10 +1933,254 @@ const [
                             일별 상담/수술전환 데이터가 없습니다.
                           </div>
                         )}
-                      </div>
+                        </div>
+                      </details>
                     </>
                   );
                 })()}
+              </article>
+            </section>
+
+
+
+            {/* ========================================
+                원장별 수술 전환율
+            ======================================== */}
+
+            <section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+
+                <div className="flex flex-wrap items-start justify-between gap-4">
+
+                  <div>
+                    <h2 className="text-lg font-black text-zinc-900">
+                      원장별 수술 전환율
+                    </h2>
+
+                    <p className="mt-1 text-sm text-zinc-500">
+                      상담예약 · 실제 상담 · 수술결정 기준
+                    </p>
+                  </div>
+
+                  <a
+                    href="/admin/import"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  >
+                    엑셀 일괄 업로드 →
+                  </a>
+
+                </div>
+
+
+                {(() => {
+
+                  const rows =
+                    dashboardData.doctorConversions ?? [];
+
+                  const totalReservations =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum + row.reservations,
+                      0
+                    );
+
+                  const totalConsultations =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum + row.consultations,
+                      0
+                    );
+
+                  const totalSurgeries =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum + row.surgeries,
+                      0
+                    );
+
+                  const totalReservationRate =
+                    totalReservations > 0
+                      ? (
+                          totalSurgeries /
+                          totalReservations
+                        ) * 100
+                      : 0;
+
+                  const totalConsultationRate =
+                    totalConsultations > 0
+                      ? (
+                          totalSurgeries /
+                          totalConsultations
+                        ) * 100
+                      : 0;
+
+
+                  return (
+                    <>
+
+                      <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            상담예약
+                          </p>
+
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {totalReservations.toLocaleString()}
+                          </p>
+                        </div>
+
+
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            실제 상담
+                          </p>
+
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {totalConsultations.toLocaleString()}
+                          </p>
+                        </div>
+
+
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            수술결정
+                          </p>
+
+                          <p className="mt-2 text-3xl font-black text-zinc-900">
+                            {totalSurgeries.toLocaleString()}
+                          </p>
+                        </div>
+
+
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            예약 → 수술
+                          </p>
+
+                          <p className="mt-2 text-3xl font-black text-blue-600">
+                            {totalReservationRate.toFixed(1)}%
+                          </p>
+                        </div>
+
+
+                        <div className="rounded-2xl bg-zinc-50 p-5">
+                          <p className="text-xs font-bold text-zinc-500">
+                            상담 → 수술
+                          </p>
+
+                          <p className="mt-2 text-3xl font-black text-blue-600">
+                            {totalConsultationRate.toFixed(1)}%
+                          </p>
+                        </div>
+
+                      </div>
+
+
+                                            <details className="group mt-5">
+                        <summary className="flex cursor-pointer list-none items-center justify-end rounded-lg px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50">
+                          <span className="group-open:hidden">
+                            원장 상세보기 ▼
+                          </span>
+                          <span className="hidden group-open:inline">
+                            접기 ▲
+                          </span>
+                        </summary>
+
+<div className="mt-3 overflow-x-auto">
+
+                        <table className="w-full min-w-[760px] text-sm">
+
+                          <thead>
+                            <tr className="border-b border-zinc-200 text-zinc-500">
+
+                              <th className="px-3 py-3 text-left">
+                                원장
+                              </th>
+
+                              <th className="px-3 py-3 text-right">
+                                상담예약
+                              </th>
+
+                              <th className="px-3 py-3 text-right">
+                                실제상담
+                              </th>
+
+                              <th className="px-3 py-3 text-right">
+                                수술결정
+                              </th>
+
+                              <th className="px-3 py-3 text-right">
+                                예약→수술
+                              </th>
+
+                              <th className="px-3 py-3 text-right">
+                                상담→수술
+                              </th>
+
+                            </tr>
+                          </thead>
+
+
+                          <tbody>
+
+                            {rows.map((row) => (
+
+                              <tr
+                                key={row.doctorName}
+                                className="border-b border-zinc-100"
+                              >
+
+                                <td className="px-3 py-3 font-bold text-zinc-900">
+                                  {row.doctorName}
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  {row.reservations.toLocaleString()}
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  {row.consultations.toLocaleString()}
+                                </td>
+
+                                <td className="px-3 py-3 text-right font-bold">
+                                  {row.surgeries.toLocaleString()}
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  {row.reservationRate.toFixed(1)}%
+                                </td>
+
+                                <td className="px-3 py-3 text-right font-black text-blue-600">
+                                  {row.consultationRate.toFixed(1)}%
+                                </td>
+
+                              </tr>
+
+                            ))}
+
+                          </tbody>
+
+                        </table>
+
+
+                        {rows.length === 0 && (
+
+                          <div className="py-10 text-center text-sm text-zinc-400">
+                            원장별 상담/수술 데이터가 없습니다.
+                          </div>
+
+                        )}
+
+                      </div>
+
+                      </details>
+
+                    </>
+                  );
+
+                })()}
+
               </article>
             </section>
 

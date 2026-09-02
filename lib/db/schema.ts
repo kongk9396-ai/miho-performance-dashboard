@@ -366,6 +366,66 @@ export const dailyCategoryConversionStats = pgTable(
     ),
   })
 );
+
+/* ========================================
+   원장별 상담 / 수술 전환
+======================================== */
+
+export const doctorConversionStats = pgTable(
+  "doctor_conversion_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    doctorName: text("doctor_name").notNull(),
+
+    /*
+     * 상담예약
+     * DB 포함 예약된 상담 건수
+     */
+    reservations: integer("reservations")
+      .notNull()
+      .default(0),
+
+    /*
+     * 실제 상담 완료 건수
+     */
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    /*
+     * 상담 후 수술 결정 건수
+     */
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateDoctorUnique: uniqueIndex(
+      "doctor_conversion_stats_date_doctor_uq"
+    ).on(
+      table.date,
+      table.doctorName
+    ),
+  })
+);
+
+
 export const dailyReports = pgTable(
   "daily_reports",
   {

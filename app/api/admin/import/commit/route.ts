@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import {
   dailyPlatformStats,
   dailyConversionStats,
+  doctorConversionStats,
   monthlyConversionStats,
   monthlyPlatformStats,
   platforms,
@@ -32,6 +33,14 @@ type ImportMonth = {
     consultations: number;
     surgeries: number;
   }[];
+
+  doctorConversions?: {
+    doctorName: string;
+    reservations: number;
+    consultations: number;
+    surgeries: number;
+  }[];
+
   consultations: number | null;
   surgeries: number | null;
 };
@@ -145,6 +154,7 @@ export async function POST(request: NextRequest) {
     let monthlyRowsSaved = 0;
     let dailyRowsSaved = 0;
     let dailyConversionRowsSaved = 0;
+    let doctorConversionRowsSaved = 0;
     let conversionMonthsSaved = 0;
     let preservedDatasets = 0;
 
@@ -433,6 +443,88 @@ export async function POST(request: NextRequest) {
         wroteSomething = true;
       }
 
+      /*
+       * ======================================
+       * 원장별 월 상담/수술전환 저장
+       * ======================================
+       */
+      const incomingDoctorConversions =
+        Array.isArray(
+          monthData.doctorConversions
+        )
+          ? monthData.doctorConversions.filter(
+              (row) =>
+                row &&
+                typeof row.doctorName ===
+                  "string" &&
+                row.doctorName.trim().length >
+                  0
+            )
+          : [];
+
+      if (
+        incomingDoctorConversions.length >
+        0
+      ) {
+        const doctorValues =
+          incomingDoctorConversions.map(
+            (row) => ({
+              date: monthStart,
+
+              doctorName:
+                row.doctorName.trim(),
+
+              reservations:
+                safeNumber(
+                  row.reservations
+                ),
+
+              consultations:
+                safeNumber(
+                  row.consultations
+                ),
+
+              surgeries:
+                safeNumber(
+                  row.surgeries
+                ),
+            })
+          );
+
+        await db
+          .insert(
+            doctorConversionStats
+          )
+          .values(
+            doctorValues
+          )
+          .onConflictDoUpdate({
+            target: [
+              doctorConversionStats.date,
+              doctorConversionStats.doctorName,
+            ],
+
+            set: {
+              reservations:
+                sql`excluded.reservations`,
+
+              consultations:
+                sql`excluded.consultations`,
+
+              surgeries:
+                sql`excluded.surgeries`,
+
+              updatedAt:
+                new Date(),
+            },
+          });
+
+        doctorConversionRowsSaved +=
+          doctorValues.length;
+
+        wroteSomething = true;
+      }
+
       const shouldWriteConversion =
         hasIncomingConversion &&
         (mode === "overwrite" || existingConversion.length === 0);
@@ -477,6 +569,7 @@ export async function POST(request: NextRequest) {
       monthlyRowsSaved,
       dailyRowsSaved,
       dailyConversionRowsSaved,
+      doctorConversionRowsSaved,
       conversionMonthsSaved,
       preservedDatasets,
     });

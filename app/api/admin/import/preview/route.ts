@@ -25,11 +25,19 @@ type DailyConversionRow = {
   surgeries: number;
 };
 
+type DoctorConversionRow = {
+  doctorName: string;
+  reservations: number;
+  consultations: number;
+  surgeries: number;
+};
+
 type MonthPreview = {
   month: string;
   platforms: PlatformRow[];
   dailyPlatforms: DailyPlatformRow[];
   dailyConversions: DailyConversionRow[];
+  doctorConversions: DoctorConversionRow[];
   consultations: number | null;
   surgeries: number | null;
   sources: string[];
@@ -42,6 +50,7 @@ type SheetCandidate = {
   monthlyPlatformScore: number;
   dailyPlatforms: DailyPlatformRow[];
   dailyConversions: DailyConversionRow[];
+  doctorConversions: DoctorConversionRow[];
   consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
@@ -54,7 +63,8 @@ type MonthAccumulator = {
   platformScore: number;
   dailyMap: Map<string, DailyPlatformRow>;
   dailyConversionMap: Map<string, DailyConversionRow>;
-  consultations: number | null;
+    doctorMap: Map<string, DoctorConversionRow>;
+consultations: number | null;
   surgeries: number | null;
   conversionScore: number;
   sources: Set<string>;
@@ -558,68 +568,129 @@ function parseComparisonPlatformLayout(rows: unknown[][]) {
 }
 
 
-function parseDailyConversionLayout(
-  rows: unknown[][],
+
+function parseMihoDailyConversionFromWorksheet(
+  worksheet: XLSX.WorkSheet,
   month: string
 ) {
   const result: DailyConversionRow[] = [];
 
-  let headerRow = -1;
-  let dateCol = -1;
-  let consultationCol = -1;
-  let conversionCol = -1;
+  const range = XLSX.utils.decode_range(
+    worksheet["!ref"] ?? "A1:A1"
+  );
 
-  for (let r = 0; r < Math.min(rows.length, 100); r++) {
-    const row = rows[r] ?? [];
+  const cellValue = (
+    row: number,
+    col: number
+  ) =>
+    worksheet[
+      XLSX.utils.encode_cell({
+        r: row,
+        c: col,
+      })
+    ]?.v;
 
-    let foundDate = -1;
-    let foundConsult = -1;
-    let foundConversion = -1;
+  /*
+   * ① "상담 대비 수술 전환율" 제목 위치 탐색
+   *
+   * "원장님 수술 전환율" 블록은 제외.
+   */
+  let titleRow = -1;
+  let titleCol = -1;
 
-    for (let c = 0; c < row.length; c++) {
-      const cell = compactText(row[c]);
-
-      if (
-        cell === "일자" ||
-        cell === "날짜"
-      ) {
-        foundDate = c;
-      }
-
-      if (
-        cell === "상담" ||
-        cell === "상담수" ||
-        cell === "상담건수" ||
-        cell === "실상담"
-      ) {
-        foundConsult = c;
-      }
-
-      if (
-        cell === "수술전환" ||
-        cell === "수술전환수" ||
-        cell === "수술결정" ||
-        cell === "수술결정수"
-      ) {
-        foundConversion = c;
-      }
-    }
-
-    if (
-      foundDate >= 0 &&
-      foundConsult >= 0 &&
-      foundConversion >= 0
+  outer:
+  for (
+    let r = range.s.r;
+    r <= Math.min(range.e.r, range.s.r + 120);
+    r++
+  ) {
+    for (
+      let c = range.s.c;
+      c <= range.e.c;
+      c++
     ) {
-      headerRow = r;
-      dateCol = foundDate;
-      consultationCol = foundConsult;
-      conversionCol = foundConversion;
-      break;
+      const text =
+        compactText(
+          cellValue(r, c)
+        );
+
+      if (
+        text.includes("상담대비수술전환율") &&
+        !text.includes("원장")
+      ) {
+        titleRow = r;
+        titleCol = c;
+        break outer;
+      }
     }
   }
 
   if (
-    headerRow < 0 ||
+    titleRow < 0 ||
+    titleCol < 0
+  ) {
+    return {
+      rows: result,
+      consultations: null as number | null,
+      surgeries: null as number | null,
+      score: 0,
+    };
+  }
+
+  /*
+   * ② 제목 바로 아래 헤더만 탐색.
+   *
+   * 월마다 블록 위치가 달라도 자동 대응.
+   */
+  const headerRow =
+    titleRow + 1;
+
+  let dateCol = -1;
+  let consultationCol = -1;
+  let conversionCol = -1;
+
+  for (
+    let c = titleCol;
+    c <= Math.min(
+      range.e.c,
+      titleCol + 7
+    );
+    c++
+  ) {
+    const header =
+      compactText(
+        cellValue(
+          headerRow,
+          c
+        )
+      );
+
+    if (
+      header === "일자" ||
+      header === "날짜"
+    ) {
+      dateCol = c;
+    }
+
+    if (
+      header === "상담" ||
+      header === "상담수" ||
+      header === "상담건수"
+    ) {
+      consultationCol = c;
+    }
+
+    if (
+      header === "수술전환" ||
+      header === "수술전환수" ||
+      header === "수술결정" ||
+      header === "수술결정수"
+    ) {
+      conversionCol = c;
+    }
+  }
+
+  if (
     dateCol < 0 ||
     consultationCol < 0 ||
     conversionCol < 0
@@ -632,66 +703,711 @@ function parseDailyConversionLayout(
     };
   }
 
-  for (let r = headerRow + 1; r < rows.length; r++) {
-    const row = rows[r] ?? [];
+  /*
+   * ③ 실제 일별 행 읽기
+   */
+  for (
+    let r = headerRow + 1;
+    r <= range.e.r;
+    r++
+  ) {
+    const rawDate =
+      cellValue(
+        r,
+        dateCol
+      );
 
-    const rawDate = row[dateCol];
+    const marker =
+      compactText(rawDate);
 
     if (
-      compactText(rawDate) === "합계" ||
-      compactText(rawDate) === "총합"
+      marker === "월합계" ||
+      marker === "합계" ||
+      marker === "총합"
     ) {
       break;
     }
 
-    const date = toDateString(rawDate, month);
+    /*
+     * 날짜 셀이 수식인 첫 행도 놓치지 않도록 처리.
+     *
+     * MIHO 일별표는 헤더 다음 행부터
+     * 1일, 2일, 3일 ... 순서로 고정되어 있다.
+     */
+    let date =
+      toDateString(
+        rawDate,
+        month
+      );
 
-    if (!date || monthKey(date) !== monthKey(month)) {
+    if (
+      !date ||
+      monthKey(date) !==
+        monthKey(month)
+    ) {
+      const day =
+        r - headerRow;
+
+      const baseMonth =
+        monthKey(month);
+
+      date =
+        `${baseMonth}-${String(day).padStart(2, "0")}`;
+    }
+
+    /*
+     * 쉬는 날/공휴일은 날짜만 있고
+     * 상담·수술칸이 비어있을 수 있음.
+     * 그 날짜도 0 / 0으로 저장.
+     */
+    const consultations =
+      intValue(
+        cellValue(
+          r,
+          consultationCol
+        )
+      ) ?? 0;
+
+    const surgeries =
+      intValue(
+        cellValue(
+          r,
+          conversionCol
+        )
+      ) ?? 0;
+
+    result.push({
+      date,
+      consultations,
+      surgeries,
+    });
+  }
+
+  /*
+   * 날짜 중복 방어
+   */
+  const rows =
+    Array.from(
+      new Map(
+        result.map(
+          (row) => [
+            row.date,
+            row,
+          ]
+        )
+      ).values()
+    ).sort(
+      (a, b) =>
+        a.date.localeCompare(
+          b.date
+        )
+    );
+
+  const consultations =
+    rows.reduce(
+      (sum, row) =>
+        sum +
+        row.consultations,
+      0
+    );
+
+  const surgeries =
+    rows.reduce(
+      (sum, row) =>
+        sum +
+        row.surgeries,
+      0
+    );
+
+  return {
+    rows,
+
+    consultations:
+      rows.length > 0
+        ? consultations
+        : null,
+
+    surgeries:
+      rows.length > 0
+        ? surgeries
+        : null,
+
+    /*
+     * 월 합계 parser보다 확실하게 우선.
+     */
+    score:
+      rows.length > 0
+        ? 9000 + rows.length
+        : 0,
+  };
+}
+
+
+/*
+ * ==========================================
+ * 원장별 월 상담 → 수술결정 parser
+ * ==========================================
+ */
+function parseMihoDoctorConversionFromWorksheet(
+  worksheet: XLSX.WorkSheet
+): DoctorConversionRow[] {
+
+  const range =
+    XLSX.utils.decode_range(
+      worksheet["!ref"] ??
+        "A1:A1"
+    );
+
+  const cellValue = (
+    row: number,
+    col: number
+  ) =>
+    worksheet[
+      XLSX.utils.encode_cell({
+        r: row,
+        c: col,
+      })
+    ]?.v;
+
+  let titleRow = -1;
+  let titleCol = -1;
+
+  outer:
+  for (
+    let r = range.s.r;
+    r <= Math.min(
+      range.e.r,
+      range.s.r + 120
+    );
+    r++
+  ) {
+    for (
+      let c = range.s.c;
+      c <= range.e.c;
+      c++
+    ) {
+      const text =
+        compactText(
+          cellValue(r, c)
+        );
+
+      if (
+        text.includes(
+          "상담대비원장님수술전환율"
+        ) ||
+        text.includes(
+          "원장님수술전환율"
+        )
+      ) {
+        titleRow = r;
+        titleCol = c;
+        break outer;
+      }
+    }
+  }
+
+  /*
+   * 예전 월은 원장표가 없을 수 있음.
+   */
+  if (
+    titleRow < 0 ||
+    titleCol < 0
+  ) {
+    return [];
+  }
+
+  const headerRow =
+    titleRow + 1;
+
+  let doctorCol = -1;
+  let reservationCol = -1;
+  let consultationCol = -1;
+  let surgeryCol = -1;
+
+  for (
+    let c = titleCol;
+    c <= Math.min(
+      range.e.c,
+      titleCol + 8
+    );
+    c++
+  ) {
+    const header =
+      compactText(
+        cellValue(
+          headerRow,
+          c
+        )
+      );
+
+    if (
+      header === "원장님" ||
+      header === "원장" ||
+      header === "원장명"
+    ) {
+      doctorCol = c;
+    }
+
+    if (
+      header.includes(
+        "상담예약"
+      ) ||
+      header.includes(
+        "DB포함"
+      )
+    ) {
+      reservationCol = c;
+    }
+
+    if (
+      header === "실상담" ||
+      header === "실제상담"
+    ) {
+      consultationCol = c;
+    }
+
+    if (
+      header === "수술결정" ||
+      header === "수술전환"
+    ) {
+      surgeryCol = c;
+    }
+  }
+
+  if (
+    doctorCol < 0 ||
+    reservationCol < 0 ||
+    consultationCol < 0 ||
+    surgeryCol < 0
+  ) {
+    return [];
+  }
+
+  const map =
+    new Map<
+      string,
+      DoctorConversionRow
+    >();
+
+  /*
+   * S/J/T처럼 행 사이가 떨어져 있어도
+   * 전부 훑어서 가져온다.
+   */
+  for (
+    let r = headerRow + 1;
+    r <= Math.min(
+      range.e.r,
+      headerRow + 120
+    );
+    r++
+  ) {
+    const doctorName =
+      String(
+        cellValue(
+          r,
+          doctorCol
+        ) ?? ""
+      ).trim();
+
+    if (!doctorName) {
       continue;
     }
 
-    const consultations = intValue(row[consultationCol]);
-    const surgeries = intValue(row[conversionCol]);
+    const key =
+      compactText(
+        doctorName
+      );
 
     if (
+      key === "합계" ||
+      key === "총계" ||
+      key === "전체" ||
+      key === "원장님"
+    ) {
+      continue;
+    }
+
+    const reservations =
+      intValue(
+        cellValue(
+          r,
+          reservationCol
+        )
+      );
+
+    const consultations =
+      intValue(
+        cellValue(
+          r,
+          consultationCol
+        )
+      );
+
+    const surgeries =
+      intValue(
+        cellValue(
+          r,
+          surgeryCol
+        )
+      );
+
+    if (
+      reservations === null &&
       consultations === null &&
       surgeries === null
     ) {
       continue;
     }
 
+    map.set(
+      doctorName,
+      {
+        doctorName,
+        reservations:
+          reservations ?? 0,
+        consultations:
+          consultations ?? 0,
+        surgeries:
+          surgeries ?? 0,
+      }
+    );
+  }
+
+  return Array.from(
+    map.values()
+  );
+}
+
+
+function parseDailyConversionLayout(
+  rows: unknown[][],
+  month: string
+) {
+  const result: DailyConversionRow[] = [];
+
+  /*
+   * ============================================
+   * MIHO 상담 대비 수술 전환율 표 전용 파서
+   *
+   * 월마다 표 위치가 이동하므로 열 고정하지 않음.
+   *
+   * 1. "상담 대비 수술 전환율" 제목 검색
+   * 2. 제목 바로 아래 헤더 검색
+   * 3. 일별 행을 순서대로 읽음
+   * 4. 날짜 셀이 수식/빈값이어도 행 순번으로 복구
+   * 5. "월 합계" 행까지 읽음
+   * ============================================
+   */
+
+  let titleRow = -1;
+  let titleCol = -1;
+
+  for (
+    let r = 0;
+    r < Math.min(rows.length, 120);
+    r++
+  ) {
+    const row = rows[r] ?? [];
+
+    for (
+      let c = 0;
+      c < row.length;
+      c++
+    ) {
+      const text =
+        compactText(
+          row[c]
+        );
+
+      if (
+        text.includes(
+          "상담대비수술전환율"
+        ) &&
+        !text.includes("원장")
+      ) {
+        titleRow = r;
+        titleCol = c;
+        break;
+      }
+    }
+
+    if (titleRow >= 0) {
+      break;
+    }
+  }
+
+  if (
+    titleRow < 0 ||
+    titleCol < 0
+  ) {
+    return {
+      rows: result,
+      consultations:
+        null as number | null,
+      surgeries:
+        null as number | null,
+      score: 0,
+    };
+  }
+
+  const headerRow =
+    titleRow + 1;
+
+  const header =
+    rows[headerRow] ?? [];
+
+  let dateCol = -1;
+  let consultationCol = -1;
+  let conversionCol = -1;
+
+  /*
+   * 제목 오른쪽 최대 8칸 안에서만
+   * 해당 표 헤더 검색.
+   *
+   * 다른 상담/수술 표와 절대 섞이지 않음.
+   */
+  for (
+    let c = titleCol;
+    c <
+      Math.min(
+        header.length,
+        titleCol + 9
+      );
+    c++
+  ) {
+    const text =
+      compactText(
+        header[c]
+      );
+
+    if (
+      text === "일자" ||
+      text === "날짜"
+    ) {
+      dateCol = c;
+    }
+
+    if (
+      text === "상담" ||
+      text === "상담수" ||
+      text === "상담건수"
+    ) {
+      consultationCol = c;
+    }
+
+    if (
+      text === "수술전환" ||
+      text === "수술전환수" ||
+      text === "수술결정" ||
+      text === "수술결정수"
+    ) {
+      conversionCol = c;
+    }
+  }
+
+  if (
+    dateCol < 0 ||
+    consultationCol < 0 ||
+    conversionCol < 0
+  ) {
+    return {
+      rows: result,
+      consultations:
+        null as number | null,
+      surgeries:
+        null as number | null,
+      score: 0,
+    };
+  }
+
+  const targetMonth =
+    monthKey(month);
+
+  let sheetTotalConsultations:
+    number | null = null;
+
+  let sheetTotalSurgeries:
+    number | null = null;
+
+  /*
+   * headerRow 다음 행 = 그 달 1일.
+   *
+   * 이 방식 때문에 첫날 날짜 셀이
+   * =B6 같은 수식이어도 절대 빠지지 않는다.
+   */
+  for (
+    let r = headerRow + 1;
+    r < rows.length;
+    r++
+  ) {
+    const row =
+      rows[r] ?? [];
+
+    const marker =
+      compactText(
+        row[dateCol]
+      );
+
+    /*
+     * 월 합계 도달
+     */
+    if (
+      marker === "월합계" ||
+      marker === "합계" ||
+      marker === "총합"
+    ) {
+      sheetTotalConsultations =
+        intValue(
+          row[
+            consultationCol
+          ]
+        );
+
+      sheetTotalSurgeries =
+        intValue(
+          row[
+            conversionCol
+          ]
+        );
+
+      break;
+    }
+
+    /*
+     * 헤더 다음 첫 행 = 1일
+     */
+    const day =
+      r - headerRow;
+
+    /*
+     * 월 일별표는 최대 31행.
+     * 합계 행을 못 찾더라도 다른 표 침범 방지.
+     */
+    if (
+      day < 1 ||
+      day > 31
+    ) {
+      break;
+    }
+
+    /*
+     * 원래 날짜가 정상이라면 사용.
+     * 수식/빈값/파싱 실패면
+     * 행 순서 기준 날짜 사용.
+     */
+    const parsedDate =
+      toDateString(
+        row[dateCol],
+        month
+      );
+
+    const fallbackDate =
+      `${targetMonth}-${String(
+        day
+      ).padStart(2, "0")}`;
+
+    const date =
+      parsedDate &&
+      monthKey(parsedDate) ===
+        targetMonth
+        ? parsedDate
+        : fallbackDate;
+
+    const consultations =
+      intValue(
+        row[
+          consultationCol
+        ]
+      ) ?? 0;
+
+    const surgeries =
+      intValue(
+        row[
+          conversionCol
+        ]
+      ) ?? 0;
+
     result.push({
       date,
-      consultations: consultations ?? 0,
-      surgeries: surgeries ?? 0,
+      consultations,
+      surgeries,
     });
   }
 
-  const totalConsultations =
-    result.reduce(
-      (sum, row) => sum + row.consultations,
+  /*
+   * 중복 날짜 방어
+   */
+  const dailyRows =
+    Array.from(
+      new Map(
+        result.map(
+          (row) => [
+            row.date,
+            row,
+          ]
+        )
+      ).values()
+    ).sort(
+      (a, b) =>
+        a.date.localeCompare(
+          b.date
+        )
+    );
+
+  const calculatedConsultations =
+    dailyRows.reduce(
+      (sum, row) =>
+        sum +
+        row.consultations,
       0
     );
 
-  const totalSurgeries =
-    result.reduce(
-      (sum, row) => sum + row.surgeries,
+  const calculatedSurgeries =
+    dailyRows.reduce(
+      (sum, row) =>
+        sum +
+        row.surgeries,
       0
     );
+
+  /*
+   * 월 합계 행이 존재하면
+   * Excel 월 합계를 최종 기준으로 사용.
+   *
+   * 상세 데이터는 일별 rows 유지.
+   */
+  const consultations =
+    sheetTotalConsultations !==
+    null
+      ? sheetTotalConsultations
+      : calculatedConsultations;
+
+  const surgeries =
+    sheetTotalSurgeries !==
+    null
+      ? sheetTotalSurgeries
+      : calculatedSurgeries;
 
   return {
-    rows: result,
+    rows: dailyRows,
+
     consultations:
-      result.length > 0
-        ? totalConsultations
+      dailyRows.length > 0
+        ? consultations
         : null,
+
     surgeries:
-      result.length > 0
-        ? totalSurgeries
+      dailyRows.length > 0
+        ? surgeries
         : null,
+
+    /*
+     * 다른 비슷한 표보다 최우선
+     */
     score:
-      result.length > 0
-        ? 1200 + result.length
+      dailyRows.length > 0
+        ? 20000 +
+          dailyRows.length
         : 0,
   };
 }
@@ -773,7 +1489,15 @@ function parseSheet(
 
   const conversion = parseMonthlyConversionLayout(rows);
   const dailyConversion =
-    parseDailyConversionLayout(rows, month);
+    parseDailyConversionLayout(
+      rows,
+      month
+    );
+
+  const doctorConversions =
+    parseMihoDoctorConversionFromWorksheet(
+      worksheet
+    );
 
   if (
     dailyConversion.score > conversion.score
@@ -805,6 +1529,7 @@ function parseSheet(
     monthlyPlatformScore,
     dailyPlatforms: dailyLayout.dailyPlatforms,
     dailyConversions: dailyConversion.rows,
+    doctorConversions,
     consultations: conversion.consultations,
     surgeries: conversion.surgeries,
     conversionScore: conversion.score,
@@ -825,6 +1550,7 @@ function getAccumulator(
     platformScore: 0,
     dailyMap: new Map(),
     dailyConversionMap: new Map(),
+    doctorMap: new Map(),
     consultations: null,
     surgeries: null,
     conversionScore: 0,
@@ -878,6 +1604,16 @@ function mergeCandidate(
   for (const row of candidate.dailyConversions ?? []) {
     accumulator.dailyConversionMap.set(
       row.date,
+      row
+    );
+  }
+
+  for (
+    const row of
+    candidate.doctorConversions ?? []
+  ) {
+    accumulator.doctorMap.set(
+      row.doctorName,
       row
     );
   }
@@ -962,6 +1698,17 @@ export async function POST(request: NextRequest) {
               a.date.localeCompare(b.date)
           );
 
+        const doctorConversions =
+          Array.from(
+            item.doctorMap.values()
+          ).sort(
+            (a, b) =>
+              a.doctorName.localeCompare(
+                b.doctorName,
+                "ko"
+              )
+          );
+
         const totalApplications = platforms.reduce(
           (sum, row) => sum + row.applications,
           0
@@ -976,6 +1723,7 @@ export async function POST(request: NextRequest) {
           platforms,
           dailyPlatforms,
           dailyConversions,
+          doctorConversions,
           consultations: item.consultations,
           surgeries: item.surgeries,
           sources: Array.from(item.sources),
@@ -1016,3 +1764,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
