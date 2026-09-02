@@ -1284,50 +1284,6 @@ export async function getDashboardData(
       T: 2,
     };
 
-  /*
-   * 2026-08 상담예약(DB포함) 원본값 보정
-   *
-   * 현재 doctor_conversion_stats에
-   * 실제상담/수술결정은 정상인데
-   * 상담예약만 0으로 저장된 상태이므로
-   * Excel 원본 예약값만 복원한다.
-   */
-  if (
-    String(month).slice(0, 7) === "2026-08"
-  ) {
-    const augustReservations:
-      Record<string, number> = {
-        S: 242,
-        J: 107,
-        T: 113,
-      };
-
-    effectiveDoctorConversions =
-      effectiveDoctorConversions.map(
-        (row) => {
-          const reservations =
-            augustReservations[
-              row.doctorName
-            ] ??
-            row.reservations;
-
-          return {
-            ...row,
-
-            reservations,
-
-            reservationRate:
-              reservations > 0
-                ? (
-                    row.surgeries /
-                    reservations
-                  ) * 100
-                : 0,
-          };
-        }
-      );
-  }
-
   effectiveDoctorConversions.sort(
     (a, b) =>
       (

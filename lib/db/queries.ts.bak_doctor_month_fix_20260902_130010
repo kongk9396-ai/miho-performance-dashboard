@@ -1135,214 +1135,42 @@ export async function getDashboardData(
    * DB에 정상적인 원장 데이터가 들어오면 DB값을 우선 사용한다.
    * ============================================
    */
-
-  /*
-   * ============================================
-   * 원장별 수술 전환율
-   * 선택 월 데이터만 집계
-   * ============================================
-   */
-  const selectedDoctorRows =
-    doctorConversionRows.filter(
-      (row) =>
-        String(
-          monthFromDate(row.date)
-        ).slice(0, 7) ===
-        String(month).slice(0, 7)
-    );
-
-  const selectedDoctorMap =
-    new Map<
-      string,
-      {
-        doctorName: string;
-        reservations: number;
-        consultations: number;
-        surgeries: number;
-      }
-    >();
-
-  for (
-    const row of selectedDoctorRows
-  ) {
-    const doctorName =
-      String(
-        row.doctorName ?? ""
-      ).trim();
-
-    if (!doctorName) {
-      continue;
-    }
-
-    const current =
-      selectedDoctorMap.get(
-        doctorName
-      ) ?? {
-        doctorName,
-        reservations: 0,
-        consultations: 0,
-        surgeries: 0,
-      };
-
-    current.reservations +=
-      Number(
-        row.reservations ?? 0
-      );
-
-    current.consultations +=
-      Number(
-        row.consultations ?? 0
-      );
-
-    current.surgeries +=
-      Number(
-        row.surgeries ?? 0
-      );
-
-    selectedDoctorMap.set(
-      doctorName,
-      current
-    );
-  }
-
-  let effectiveDoctorConversions =
-    Array.from(
-      selectedDoctorMap.values()
-    ).map(
-      (row) => ({
-        ...row,
-
-        reservationRate:
-          row.reservations > 0
-            ? (
-                row.surgeries /
-                row.reservations
-              ) * 100
-            : 0,
-
-        consultationRate:
-          row.consultations > 0
-            ? (
-                row.surgeries /
-                row.consultations
-              ) * 100
-            : 0,
-      })
-    );
-
-  /*
-   * 8월 DB 원장 데이터가 아직 없다면
-   * Excel 원본값으로 임시 fallback.
-   */
-  if (
-    String(month).slice(0, 7) ===
-      "2026-08" &&
-    effectiveDoctorConversions.length ===
-      0
-  ) {
-    effectiveDoctorConversions = [
-      {
-        doctorName: "S",
-        reservations: 242,
-        consultations: 139,
-        surgeries: 25,
-        reservationRate:
-          (25 / 242) * 100,
-        consultationRate:
-          (25 / 139) * 100,
-      },
-      {
-        doctorName: "J",
-        reservations: 107,
-        consultations: 72,
-        surgeries: 19,
-        reservationRate:
-          (19 / 107) * 100,
-        consultationRate:
-          (19 / 72) * 100,
-      },
-      {
-        doctorName: "T",
-        reservations: 113,
-        consultations: 80,
-        surgeries: 22,
-        reservationRate:
-          (22 / 113) * 100,
-        consultationRate:
-          (22 / 80) * 100,
-      },
-    ];
-  }
-
-  /*
-   * 원장 순서 고정: S → J → T
-   */
-  const doctorOrder:
-    Record<string, number> = {
-      S: 0,
-      J: 1,
-      T: 2,
-    };
-
-  /*
-   * 2026-08 상담예약(DB포함) 원본값 보정
-   *
-   * 현재 doctor_conversion_stats에
-   * 실제상담/수술결정은 정상인데
-   * 상담예약만 0으로 저장된 상태이므로
-   * Excel 원본 예약값만 복원한다.
-   */
-  if (
-    String(month).slice(0, 7) === "2026-08"
-  ) {
-    const augustReservations:
-      Record<string, number> = {
-        S: 242,
-        J: 107,
-        T: 113,
-      };
-
-    effectiveDoctorConversions =
-      effectiveDoctorConversions.map(
-        (row) => {
-          const reservations =
-            augustReservations[
-              row.doctorName
-            ] ??
-            row.reservations;
-
-          return {
-            ...row,
-
-            reservations,
-
+  const effectiveDoctorConversions =
+    String(month).slice(0, 7) === "2026-08" &&
+    (doctorConversions?.length ?? 0) === 0
+      ? [
+          {
+            doctorName: "S",
+            reservations: 242,
+            consultations: 139,
+            surgeries: 25,
             reservationRate:
-              reservations > 0
-                ? (
-                    row.surgeries /
-                    reservations
-                  ) * 100
-                : 0,
-          };
-        }
-      );
-  }
-
-  effectiveDoctorConversions.sort(
-    (a, b) =>
-      (
-        doctorOrder[
-          a.doctorName
-        ] ?? 99
-      ) -
-      (
-        doctorOrder[
-          b.doctorName
-        ] ?? 99
-      )
-  );
-
-
+              (25 / 242) * 100,
+            consultationRate:
+              (25 / 139) * 100,
+          },
+          {
+            doctorName: "J",
+            reservations: 107,
+            consultations: 72,
+            surgeries: 19,
+            reservationRate:
+              (19 / 107) * 100,
+            consultationRate:
+              (19 / 72) * 100,
+          },
+          {
+            doctorName: "T",
+            reservations: 113,
+            consultations: 80,
+            surgeries: 22,
+            reservationRate:
+              (22 / 113) * 100,
+            consultationRate:
+              (22 / 80) * 100,
+          },
+        ]
+      : doctorConversions;
 
   return {
     selectedMonth:
