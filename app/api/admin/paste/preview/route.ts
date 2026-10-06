@@ -84,7 +84,7 @@ function normalizePlatformName(
     .toLowerCase()
     .replace(/\s+/g, "");
 
-  if (name.startsWith("홈페이지")) {
+  if (name.startsWith("홈페이지") || name.startsWith("홈피")) {
     return "홈페이지";
   }
 
@@ -140,48 +140,65 @@ function normalizePlatformName(
 function parsePlatformPairs(
   line: string
 ) {
-  const matches = Array.from(
-    line.matchAll(
-      /(\d+)\s*\/\s*(\d+)/g
-    )
+  // PAREN_TOTAL_FIX
+  /*
+    괄호 안 부위별 내역(코/눈 등)은 합계에서 제외
+    예) 강언 3/4 (코 1/1 눈 2/3) -> 예약 3 / 신청 4
+  */
+  const main = line
+    .replace(/\([^)]*(\)|$)/g, " ")
+    .trim();
+
+  /*
+    "플랫폼명 예약/신청" 형태면 그 값이 합계
+  */
+  const total = main.match(
+    /^[가-힣A-Za-z]+\s*[-:]?\s*(\d+)\s*\/\s*(\d+)/
   );
 
-  if (matches.length === 0) {
-    /*
-      CPA 0
-      cpa 0
-      바비톡 0
-      처럼 단일 숫자로 오는 경우
-    */
-    const single =
-      line.match(
-        /(?:CPA|cpa|바비톡|강남언니|강언|홈페이지|플친|플러스친구|메타|meta)\s*(\d+)\s*$/i
-      );
+  if (total) {
+    return {
+      reservations: Number(total[1]),
+      applications: Number(total[2]),
+    };
+  }
 
-    if (single) {
-      return {
-        applications: Number(single[1]),
-        reservations: 0,
-      };
+  /*
+    옛 형식: 네이버 눈 0/0 코 0/0 눈코 1/1
+    합계가 없으므로 전부 합산
+  */
+  const matches = Array.from(
+    main.matchAll(/(\d+)\s*\/\s*(\d+)/g)
+  );
+
+  if (matches.length > 0) {
+    let reservations = 0;
+    let applications = 0;
+
+    for (const match of matches) {
+      reservations += Number(match[1]);
+      applications += Number(match[2]);
     }
 
-    return null;
+    return { applications, reservations };
   }
 
-  let reservations = 0;
-  let applications = 0;
+  /*
+    CPA 0 / 바비톡 0 처럼 단일 숫자
+  */
+  const single = main.match(
+    /(?:CPA|cpa|바비톡|강남언니|강언|홈페이지|홈피|플친|플러스친구|메타|meta|네이버)\s*(\d+)\s*$/i
+  );
 
-  for (const match of matches) {
-    reservations += Number(match[1]);
-    applications += Number(match[2]);
+  if (single) {
+    return {
+      applications: Number(single[1]),
+      reservations: 0,
+    };
   }
 
-  return {
-    applications,
-    reservations,
-  };
+  return null;
 }
-
 function emptyCallStats(): CallStats {
   return {
     total: 0,
@@ -602,6 +619,12 @@ function parseOneBlock(
         );
 
       if (!platform) {
+        if (/\d+\s*\/\s*\d+/.test(line)) {
+          result.warnings.push({
+            line,
+            reason: "플랫폼 목록에 없는 항목이라 집계에서 제외했습니다.",
+          });
+        }
         continue;
       }
 
