@@ -39,6 +39,13 @@ const menuGroups = [
         href: "/admin/import",
         icon: FileSpreadsheet,
       },
+      {
+        title: "상담 · 수술 전환 붙여넣기",
+        description:
+          "구글 시트의 일별 상담 대비 수술 전환과 원장님별 수술 전환율을 그대로 붙여넣어 저장합니다.",
+        href: "/admin/conversion-paste",
+        icon: FileSpreadsheet,
+      },
     ],
   },
   {
