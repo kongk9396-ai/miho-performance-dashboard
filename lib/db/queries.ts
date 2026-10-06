@@ -833,96 +833,88 @@ export async function getDashboardData(
 
     유튜브 표기 차이는 하나로 통합한다.
   */
-  const visitSourceMap =
-    new Map<string, number>();
+  /*
+    VISIT_SOURCE_BY_ROUTE
+    월별 내원경로 집계 (경로별로 따로 합산)
+    표기만 다른 같은 경로는 하나로 통일한다.
+  */
+  function normalizeVisitSource(
+    value: string
+  ) {
+    const rawSource =
+      String(value ?? "").trim();
 
-  visitSourceRows
-    .filter(
-      (row) =>
-        String(
-          monthFromDate(
-            row.date
-          )
-        ).slice(0, 7) ===
-        String(month).slice(0, 7)
-    )
-    .forEach((row) => {
-      const rawSource =
-        String(
-          row.source ?? ""
-        ).trim();
+    const compact =
+      rawSource
+        .replace(/\s+/g, "")
+        .toLowerCase();
 
-      const compactSource =
-        rawSource
-          .replace(/\s+/g, "")
-          .toLowerCase();
+    if (
+      ["유튜브", "유투브", "유튭", "유트브", "youtube", "yt"].includes(compact)
+    ) {
+      return "유튜브";
+    }
 
-      let normalizedSource =
-        rawSource;
+    if (
+      ["메타광고", "매타광고", "메타", "매타", "meta", "meta광고"].includes(compact)
+    ) {
+      return "메타광고";
+    }
 
+    if (
+      ["강남언니", "강언"].includes(compact)
+    ) {
+      return "강남언니";
+    }
+
+    return rawSource;
+  }
+
+  function buildVisitSources(
+    targetMonth: string
+  ) {
+    const map =
+      new Map<string, number>();
+
+    for (const row of visitSourceRows) {
       if (
-        [
-          "유튜브",
-          "유투브",
-          "유튭",
-          "유트브",
-          "youtube",
-          "yt",
-        ].includes(
-          compactSource
-        )
+        String(row.date).slice(0, 7) !==
+        String(targetMonth).slice(0, 7)
       ) {
-        normalizedSource =
-          "유튜브";
-      } else if (
-        [
-          "메타광고",
-          "매타광고",
-          "메타",
-          "매타",
-          "meta",
-          "meta광고",
-        ].includes(
-          compactSource
-        )
-      ) {
-        normalizedSource =
-          "메타광고";
+        continue;
       }
 
-      if (!normalizedSource) {
-        return;
+      const source =
+        normalizeVisitSource(row.source);
+
+      if (!source) {
+        continue;
       }
 
-      visitSourceMap.set(
-        normalizedSource,
-        (
-          visitSourceMap.get(
-            normalizedSource
-          ) ?? 0
-        ) + row.count
+      map.set(
+        source,
+        (map.get(source) ?? 0) +
+          Number(row.count ?? 0)
       );
-    });
+    }
+
+    return Array.from(map.entries())
+      .map(([source, count]) => ({
+        source,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }
 
   const monthlyVisitSources =
-    Array.from(
-      visitSourceMap.entries()
-    )
-      .map(
-        ([source, count]) => ({
-          source,
-          count,
-        })
-      )
-      .sort(
-        (a, b) =>
-          b.count - a.count
-      );
+    buildVisitSources(month);
+
+  const previousVisitSources =
+    buildVisitSources(previousMonth);
 
   const totalVisitSourceCount =
     monthlyVisitSources.reduce(
-      (sum, row) =>
-        sum + row.count,
+      (sum, row) => sum + row.count,
       0
     );
   const dailyConversions =
@@ -1451,6 +1443,7 @@ export async function getDashboardData(
     monthlyTrend,
 
     monthlyVisitSources,
+    previousVisitSources,
     totalVisitSourceCount,
     dailyConversions,
     doctorConversions: effectiveDoctorConversions,

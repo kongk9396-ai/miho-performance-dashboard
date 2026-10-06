@@ -48,6 +48,7 @@ type DashboardData = {
   monthlyTrend: TrendRow[];
   monthlyVisitSources: { source: string; count: number }[];
   totalVisitSourceCount: number;
+  previousVisitSources?: { source: string; count: number }[];
   dailyConversions: {
     date: string;
     actualSurgeries?: number;
@@ -1191,6 +1192,174 @@ function PlatformDetailTable({
     </article>
   );
 }
+/*
+  VISIT_SOURCE_TABLE
+  내원경로별 집계 (전월 대비)
+*/
+function VisitSourceTable({
+  current,
+  previous,
+}: {
+  current: { source: string; count: number }[];
+  previous: { source: string; count: number }[];
+}) {
+  const currentMap = new Map(
+    current.map((row) => [row.source, row.count])
+  );
+
+  const previousMap = new Map(
+    previous.map((row) => [row.source, row.count])
+  );
+
+  const names = Array.from(
+    new Set([
+      ...current.map((row) => row.source),
+      ...previous.map((row) => row.source),
+    ])
+  );
+
+  const currentTotal = current.reduce(
+    (sum, row) => sum + row.count,
+    0
+  );
+
+  const previousTotal = previous.reduce(
+    (sum, row) => sum + row.count,
+    0
+  );
+
+  const rows = names
+    .map((name) => {
+      const now = currentMap.get(name) ?? 0;
+      const before = previousMap.get(name) ?? 0;
+
+      return {
+        name,
+        now,
+        before,
+        delta: now - before,
+        share:
+          currentTotal > 0
+            ? (now / currentTotal) * 100
+            : 0,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.now - a.now || b.before - a.before
+    );
+
+  const Delta = ({ value }: { value: number }) => {
+    if (value > 0) {
+      return (
+        <span className="font-bold text-red-500">
+          ▲ {value.toLocaleString()}
+        </span>
+      );
+    }
+
+    if (value < 0) {
+      return (
+        <span className="font-bold text-blue-600">
+          ▼ {Math.abs(value).toLocaleString()}
+        </span>
+      );
+    }
+
+    return (
+      <span className="font-semibold text-zinc-400">
+        -
+      </span>
+    );
+  };
+
+  return (
+    <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-zinc-950">
+          내원경로별 집계
+        </h2>
+
+        <p className="mt-1 text-sm text-zinc-500">
+          DB보고 내원경로 기준 · 전월 대비 (플랫폼 신청/예약과 별도 집계)
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-xl bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-400">
+          등록된 내원경로 데이터가 없습니다.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-y border-zinc-200 bg-zinc-50 text-zinc-600">
+                <th className="px-4 py-3 text-left font-semibold">
+                  내원경로
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  전월
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  증감
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 비중
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.name}
+                  className="border-b border-zinc-100 transition hover:bg-zinc-50"
+                >
+                  <td className="px-4 py-4 font-bold text-zinc-900">
+                    {row.name}
+                  </td>
+                  <td className="px-4 py-4 text-right text-zinc-500">
+                    {row.before.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-zinc-950">
+                    {row.now.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    <Delta value={row.delta} />
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold text-blue-600">
+                    {row.share.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+
+              <tr className="bg-zinc-50">
+                <td className="px-4 py-4 font-black text-zinc-950">
+                  합계
+                </td>
+                <td className="px-4 py-4 text-right font-bold text-zinc-500">
+                  {previousTotal.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 text-right font-black text-zinc-950">
+                  {currentTotal.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 text-right">
+                  <Delta value={currentTotal - previousTotal} />
+                </td>
+                <td className="px-4 py-4 text-right font-bold text-zinc-400">
+                  100%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
 export default function DashboardClient({
   data,
   availableMonths,
@@ -2226,6 +2395,12 @@ const [
               <PlatformDetailTable
                 current={current}
                 previous={previous}
+              />
+            </section>
+            <section className="mt-6">
+              <VisitSourceTable
+                current={dashboardData.monthlyVisitSources ?? []}
+                previous={dashboardData.previousVisitSources ?? []}
               />
             </section>
 
