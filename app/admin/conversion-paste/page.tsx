@@ -24,6 +24,7 @@ export default function ConversionPastePage() {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState("");
   const [text, setText] = useState("");
+  const [doctorText, setDoctorText] = useState("");
   const [result, setResult] =
     useState<ConversionParseResult | null>(null);
   const [saving, setSaving] = useState(false);
@@ -63,6 +64,28 @@ export default function ConversionPastePage() {
 
     const parsed = parseConversionSheet(text, year);
 
+    /*
+      원장님 표 전용 칸: 여기 입력한 원장 데이터가 우선
+    */
+    if (doctorText.trim()) {
+      const doctorParsed = parseConversionSheet(doctorText, year);
+      const merged = new Map(
+        parsed.doctors.map((doctor) => [doctor.doctorName, doctor])
+      );
+      for (const doctor of doctorParsed.doctors) {
+        merged.set(doctor.doctorName, doctor);
+      }
+      parsed.doctors = Array.from(merged.values());
+
+      if (doctorParsed.doctors.length === 0) {
+        setResult(null);
+        setError(
+          "원장님 칸에서 인식된 원장이 없습니다. '원장님 | 상담예약 | 실상담 | 수술결정' 표를 그대로 복사해주세요."
+        );
+        return;
+      }
+    }
+
     if (
       parsed.days.length === 0 &&
       parsed.doctors.length === 0
@@ -78,6 +101,15 @@ export default function ConversionPastePage() {
 
     if (parsed.detectedMonth) {
       setMonth(parsed.detectedMonth);
+    } else {
+      /*
+        원장님 표 제목의 "9월" 같은 글자로 기준월 추정
+      */
+      const monthMatch = `${doctorText}\n${text}`.match(/(\d{1,2})\s*월/);
+      const guessed = monthMatch ? Number(monthMatch[1]) : 0;
+      if (guessed >= 1 && guessed <= 12) {
+        setMonth(`${year}-${String(guessed).padStart(2, "0")}`);
+      }
     }
   }
 
@@ -217,11 +249,34 @@ export default function ConversionPastePage() {
             className="min-h-[360px] w-full resize-y rounded-2xl border border-zinc-200 bg-zinc-50 p-5 font-mono text-sm leading-7 text-zinc-800 outline-none transition focus:border-blue-500 focus:bg-white"
           />
 
+          <div className="mt-7">
+            <h3 className="text-lg font-black text-zinc-950">
+              원장님 수술 전환 붙여넣기
+            </h3>
+            <p className="mt-1 mb-3 text-sm text-zinc-500">
+              원장님 표만 따로 붙여넣는 칸입니다. 위 칸에 일별 표가 없어도
+              됩니다. 일별 날짜가 없으면 아래에서 저장할 월을 선택해주세요.
+            </p>
+            <textarea
+              value={doctorText}
+              onChange={(event) => {
+                setDoctorText(event.target.value);
+                setResult(null);
+                setMessage("");
+              }}
+              placeholder={`예)
+원장님\t상담예약(DB포함)\t실상담\t수술결정\t상담예약 전환율\t실상담 전환율
+S\t278\t131\t27\t10%\t20.61%
+J\t129\t75\t29\t22%\t38.67%`}
+              className="min-h-[200px] w-full resize-y rounded-2xl border border-zinc-200 bg-zinc-50 p-5 font-mono text-sm leading-7 text-zinc-800 outline-none transition focus:border-blue-500 focus:bg-white"
+            />
+          </div>
+
           <div className="mt-5 flex justify-end">
             <button
               type="button"
               onClick={analyze}
-              disabled={!text.trim()}
+              disabled={!text.trim() && !doctorText.trim()}
               className="rounded-xl bg-blue-600 px-6 py-3 font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
             >
               분석하기
@@ -302,6 +357,18 @@ export default function ConversionPastePage() {
                     .map((day) => day.date)
                     .join(", ")}{" "}
                   — 한 번에 한 달씩 붙여넣어주세요.
+                </div>
+              )}
+
+              {(result.holidayDates ?? []).length > 0 && (
+                <div className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                  휴무일이라 0으로 처리(저장 안 함):{" "}
+                  {(result.holidayDates ?? [])
+                    .map(
+                      (day) =>
+                        `${day.date.slice(5)}(${day.reason})`
+                    )
+                    .join(", ")}
                 </div>
               )}
 
