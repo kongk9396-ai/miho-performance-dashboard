@@ -70,6 +70,14 @@ const FIXED_HOLIDAYS: Record<number, Record<string, string>> = {
   },
 };
 
+/*
+  공휴일이지만 실제로 진료한 날 (휴무 처리하지 않음)
+  진료한 날이 생기면 "YYYY-MM-DD" 형식으로 추가
+*/
+const WORKING_DAYS = new Set<string>([
+  "2026-09-24", // 추석 연휴 첫날 진료
+]);
+
 const cache = new Map<number, Map<string, string>>();
 
 function pad(value: number) {
@@ -139,6 +147,10 @@ export function getClosedReason(ymd: string): string | null {
   const text = String(ymd).slice(0, 10);
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return null;
+  }
+
+  if (WORKING_DAYS.has(text)) {
     return null;
   }
 
