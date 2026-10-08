@@ -6,7 +6,10 @@
 
   두 표를 따로 복사해도 되고, 나란히 놓인 채로 한 번에 복사해도 된다.
   전환율(%) 칸은 무시하고 저장 시 다시 계산한다.
+  일요일·공휴일 행은 값이 있어도 저장하지 않는다(0 고정).
 */
+
+import { getClosedReason } from "@/lib/kr-holidays";
 
 export type ConversionDay = {
   date: string;
@@ -26,6 +29,7 @@ export type ConversionParseResult = {
   days: ConversionDay[];
   doctors: DoctorRow[];
   skippedDates: string[];
+  holidayDates: { date: string; reason: string }[];
   detectedMonth: string | null;
 };
 
@@ -139,6 +143,8 @@ export function parseConversionSheet(
 
   const skipped = new Set<string>();
 
+  const holidays = new Map<string, string>();
+
   const lines = text
     .replace(/\r\n/g, "\n")
     .split("\n");
@@ -169,6 +175,21 @@ export function parseConversionSheet(
           cells[index + 2],
           cells[index + 3],
         ];
+
+        const closedReason = getClosedReason(date);
+
+        if (closedReason) {
+          /*
+            휴무일: 값이 있어도 무시
+          */
+          if (!values.every(isBlank)) {
+            holidays.set(date, closedReason);
+          }
+
+          skipped.delete(date);
+          index += 4;
+          continue;
+        }
 
         if (values.every(isBlank)) {
           skipped.add(date);
@@ -265,6 +286,9 @@ export function parseConversionSheet(
     skippedDates: Array.from(skipped)
       .filter((date) => !dayMap.has(date))
       .sort(),
+    holidayDates: Array.from(holidays.entries())
+      .map(([date, reason]) => ({ date, reason }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
     detectedMonth,
   };
-}
+}

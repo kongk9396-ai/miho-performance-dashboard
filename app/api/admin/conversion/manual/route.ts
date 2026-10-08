@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 
 import { isAdminAuthenticated } from "@/lib/auth/admin";
+import { isClosedDay } from "@/lib/kr-holidays";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -326,6 +327,16 @@ export async function POST(
                   "string" &&
                 row.date >= start &&
                 row.date < next
+            ).map((row) =>
+              /* 일요일·공휴일은 무조건 0 */
+              isClosedDay(row.date)
+                ? {
+                    ...row,
+                    actualSurgeries: 0,
+                    consultations: 0,
+                    surgeries: 0,
+                  }
+                : row
             )
           : [];
 

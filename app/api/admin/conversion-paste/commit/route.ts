@@ -7,6 +7,7 @@ import {
   and,
   eq,
   gte,
+  inArray,
   lt,
   sql,
 } from "drizzle-orm";
@@ -23,6 +24,11 @@ import {
 import {
   isAdminAuthenticated,
 } from "@/lib/auth/admin";
+
+import {
+  closedDaysInMonth,
+  isClosedDay,
+} from "@/lib/kr-holidays";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -121,9 +127,15 @@ export async function POST(
       );
     }
 
-    const days: DayInput[] = Array.isArray(body.days)
-      ? body.days
-      : [];
+    /*
+      일요일·공휴일은 저장하지 않는다
+    */
+    const days: DayInput[] = (
+      Array.isArray(body.days) ? body.days : []
+    ).filter(
+      (day: DayInput) =>
+        !isClosedDay(String(day?.date ?? ""))
+    );
 
     const doctors: DoctorInput[] = Array.isArray(
       body.doctors
@@ -191,6 +203,28 @@ export async function POST(
             updatedAt: new Date(),
           },
         });
+    }
+
+    /*
+      1-1. 휴무일은 기존에 들어간 값까지 0으로 정리
+    */
+    const closedDays = closedDaysInMonth(month);
+
+    if (days.length > 0 && closedDays.length > 0) {
+      await db
+        .update(dailyConversionStats)
+        .set({
+          actualSurgeries: 0,
+          consultations: 0,
+          surgeries: 0,
+          updatedAt: new Date(),
+        })
+        .where(
+          inArray(
+            dailyConversionStats.date,
+            closedDays
+          )
+        );
     }
 
     /*
@@ -313,4 +347,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
+}

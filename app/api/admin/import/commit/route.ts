@@ -11,6 +11,7 @@ import {
   platforms,
 } from "@/lib/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth/admin";
+import { isClosedDay } from "@/lib/kr-holidays";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -526,17 +527,26 @@ export async function POST(request: NextRequest) {
 
         const values =
           incomingDailyConversions.map(
-            (row) => ({
-              date: row.date,
-              actualSurgeries:
-                safeNumber(
-                  row.actualSurgeries
-                ),
-              consultations:
-                safeNumber(row.consultations),
-              surgeries:
-                safeNumber(row.surgeries),
-            })
+            (row) =>
+              /* 일요일·공휴일은 0 고정 */
+              isClosedDay(row.date)
+                ? {
+                    date: row.date,
+                    actualSurgeries: 0,
+                    consultations: 0,
+                    surgeries: 0,
+                  }
+                : {
+                    date: row.date,
+                    actualSurgeries:
+                      safeNumber(
+                        row.actualSurgeries
+                      ),
+                    consultations:
+                      safeNumber(row.consultations),
+                    surgeries:
+                      safeNumber(row.surgeries),
+                  }
           );
 
         await db
