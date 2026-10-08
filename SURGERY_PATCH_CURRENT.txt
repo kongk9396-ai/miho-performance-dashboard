@@ -1,0 +1,5257 @@
+﻿===== GIT =====
+ M components/DashboardClient.tsx
+?? components/DashboardClient.tsx.bak_platform_detail_20260901_135132
+?? components/DashboardClient.tsx.bak_platform_detail_20260901_135241
+1b471b0 Restore monthly visit source dashboard
+b363985 Fix monthly dashboard data integration
+4cf4fe7 Rebuild smart Excel import pipeline
+
+===== SCHEMA =====
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  bigint,
+  boolean,
+  date,
+  timestamp,
+  uniqueIndex,
+  jsonb,
+} from "drizzle-orm/pg-core";
+
+/* ========================================
+   플랫폼 마스터
+======================================== */
+
+export const platforms = pgTable(
+  "platforms",
+  {
+    id: serial("id").primaryKey(),
+
+    name: text("name").notNull(),
+
+    sortOrder: integer("sort_order")
+      .notNull()
+      .default(0),
+
+    isActive: boolean("is_active")
+      .notNull()
+      .default(true),
+
+    includeInTotal: boolean("include_in_total")
+      .notNull()
+      .default(true),
+
+    includeInChannelChart: boolean(
+      "include_in_channel_chart"
+    )
+      .notNull()
+      .default(true),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    nameUnique: uniqueIndex(
+      "platforms_name_uq"
+    ).on(table.name),
+  })
+);
+
+/* ========================================
+   실장 마스터
+======================================== */
+
+export const managers = pgTable(
+  "managers",
+  {
+    id: serial("id").primaryKey(),
+
+    name: text("name").notNull(),
+
+    sortOrder: integer("sort_order")
+      .notNull()
+      .default(0),
+
+    isActive: boolean("is_active")
+      .notNull()
+      .default(true),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    nameUnique: uniqueIndex(
+      "managers_name_uq"
+    ).on(table.name),
+  })
+);
+
+/* ========================================
+   월간 플랫폼 실적
+======================================== */
+
+export const monthlyPlatformStats = pgTable(
+  "monthly_platform_stats_v2",
+  {
+    id: serial("id").primaryKey(),
+
+    month: date("month").notNull(),
+
+    platformId: integer("platform_id")
+      .notNull()
+      .references(() => platforms.id),
+
+    applications: integer("applications")
+      .notNull()
+      .default(0),
+
+    reservations: integer("reservations")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    monthPlatformUnique: uniqueIndex(
+      "monthly_platform_stats_v2_month_platform_uq"
+    ).on(
+      table.month,
+      table.platformId
+    ),
+  })
+);
+
+/* ========================================
+   월간 전체 상담 / 수술
+======================================== */
+
+export const monthlyConversionStats = pgTable(
+  "monthly_conversion_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    month: date("month").notNull(),
+
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    monthUnique: uniqueIndex(
+      "monthly_conversion_month_uq"
+    ).on(table.month),
+  })
+);
+
+/* ========================================
+   실장 월간 실적
+======================================== */
+
+export const managerPerformance = pgTable(
+  "manager_performance_v2",
+  {
+    id: serial("id").primaryKey(),
+
+    month: date("month").notNull(),
+
+    managerId: integer("manager_id")
+      .notNull()
+      .references(() => managers.id),
+
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    revenue: bigint("revenue", {
+      mode: "number",
+    })
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    monthManagerUnique: uniqueIndex(
+      "manager_performance_v2_month_manager_uq"
+    ).on(
+      table.month,
+      table.managerId
+    ),
+  })
+);
+
+/* ========================================
+   일별 플랫폼 실적
+======================================== */
+
+export const dailyPlatformStats = pgTable(
+  "daily_platform_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    platformId: integer("platform_id")
+      .notNull()
+      .references(() => platforms.id),
+
+    applications: integer("applications")
+      .notNull()
+      .default(0),
+
+    reservations: integer("reservations")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    datePlatformUnique: uniqueIndex(
+      "daily_platform_stats_date_platform_uq"
+    ).on(
+      table.date,
+      table.platformId
+    ),
+  })
+);
+
+/* ========================================
+   일별 상담 / 수술
+   현재는 확장용.
+======================================== */
+
+export const dailyConversionStats = pgTable(
+  "daily_conversion_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateUnique: uniqueIndex(
+      "daily_conversion_stats_date_uq"
+    ).on(table.date),
+  })
+);
+
+/* ========================================
+   일일 보고 원문
+======================================== */
+
+
+export const dailyCategoryConversionStats = pgTable(
+  "daily_category_conversion_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    category: text("category").notNull(),
+
+    consultations: integer("consultations")
+      .notNull()
+      .default(0),
+
+    surgeries: integer("surgeries")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateCategoryUnique: uniqueIndex(
+      "daily_category_conversion_stats_date_category_uq"
+    ).on(
+      table.date,
+      table.category
+    ),
+  })
+);
+export const dailyReports = pgTable(
+  "daily_reports",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    rawText: text("raw_text")
+      .notNull()
+      .default(""),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateUnique: uniqueIndex(
+      "daily_reports_date_uq"
+    ).on(table.date),
+  })
+);
+
+
+/* ========================================
+   전날콜 / 7콜
+======================================== */
+
+export const dailyCallStats = pgTable(
+  "daily_call_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    previousTotal: integer(
+      "previous_total"
+    )
+      .notNull()
+      .default(0),
+
+    previousDetails: jsonb(
+      "previous_details"
+    )
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+
+    sevenTotal: integer(
+      "seven_total"
+    )
+      .notNull()
+      .default(0),
+
+    sevenDetails: jsonb(
+      "seven_details"
+    )
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateUnique: uniqueIndex(
+      "daily_call_stats_date_uq"
+    ).on(table.date),
+  })
+);
+
+
+/* ========================================
+   내원경로
+======================================== */
+
+export const dailyVisitSources = pgTable(
+  "daily_visit_sources",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    source: text("source")
+      .notNull(),
+
+    count: integer("count")
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateSourceUnique: uniqueIndex(
+      "daily_visit_sources_date_source_uq"
+    ).on(
+      table.date,
+      table.source
+    ),
+  })
+);
+
+
+/* ========================================
+   총인콜
+======================================== */
+
+export const dailyIncallStats = pgTable(
+  "daily_incall_stats",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    total: integer("total")
+      .notNull()
+      .default(0),
+
+    newCount: integer("new_count")
+      .notNull()
+      .default(0),
+
+    simpleCount: integer(
+      "simple_count"
+    )
+      .notNull()
+      .default(0),
+
+    changedCount: integer(
+      "changed_count"
+    )
+      .notNull()
+      .default(0),
+
+    canceledCount: integer(
+      "canceled_count"
+    )
+      .notNull()
+      .default(0),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+
+  (table) => ({
+    dateUnique: uniqueIndex(
+      "daily_incall_stats_date_uq"
+    ).on(table.date),
+  })
+);
+
+
+/* ========================================
+   당일취소 상세
+======================================== */
+
+export const dailyCancellations = pgTable(
+  "daily_cancellations",
+  {
+    id: serial("id").primaryKey(),
+
+    date: date("date").notNull(),
+
+    patientText: text(
+      "patient_text"
+    )
+      .notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  }
+);
+
+
+
+
+===== QUERIES =====
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  lt,
+  lte,
+} from "drizzle-orm";
+
+import { db } from "./index";
+
+import {
+  dailyCategoryConversionStats,
+  dailyConversionStats,
+  dailyPlatformStats,
+  dailyVisitSources,
+  monthlyConversionStats,
+  monthlyPlatformStats,
+  platforms,
+} from "./schema";
+
+/* ========================================
+   날짜 유틸
+======================================== */
+
+function shiftMonth(
+  month: string,
+  offset: number
+) {
+  const [year, monthNumber] =
+    month
+      .split("-")
+      .map(Number);
+
+  const date = new Date(
+    Date.UTC(
+      year,
+      monthNumber - 1 + offset,
+      1
+    )
+  );
+
+  return `${date.getUTCFullYear()}-${String(
+    date.getUTCMonth() + 1
+  ).padStart(2, "0")}-01`;
+}
+
+function monthFromDate(
+  date: string
+) {
+  return `${date.slice(0, 7)}-01`;
+}
+
+/*
+  선택월 기준 DB 조회 범위
+
+  예:
+  selectedMonth = 2026-04-01
+
+  start = 2025-04-01
+  next  = 2026-05-01
+
+  즉:
+  >= 2025-04-01
+  <  2026-05-01
+
+  4월 31일 같은 잘못된 날짜가
+  절대 만들어지지 않음.
+*/
+function getDashboardDateRange(
+  selectedMonth: string
+) {
+  const start =
+    shiftMonth(
+      selectedMonth,
+      -12
+    );
+
+  const next =
+    shiftMonth(
+      selectedMonth,
+      1
+    );
+
+  return {
+    start,
+    next,
+  };
+}
+
+/* ========================================
+   타입
+======================================== */
+
+type PlatformDbRow = {
+  month: string;
+  date?: string;
+
+  applications: number;
+  reservations: number;
+
+  platformName: string;
+
+  sortOrder: number;
+
+  includeInTotal: boolean;
+  includeInChannelChart: boolean;
+};
+
+type ConversionDbRow = {
+  month: string;
+
+  consultations: number;
+  surgeries: number;
+};
+
+/* ========================================
+   월별 플랫폼 데이터 결정
+
+   일별 데이터가 존재하는 월:
+   → 일별 합계 우선
+
+   일별 데이터가 없는 과거 월:
+   → 기존 monthly 테이블 사용
+======================================== */
+
+function getEffectivePlatformRows(
+  month: string,
+  monthlyRows: PlatformDbRow[],
+  dailyRows: PlatformDbRow[]
+) {
+  const monthKey =
+    String(month).slice(0, 7);
+
+  /*
+    월간 보기:
+    엑셀의 월 합계 행에서 저장된 monthly 데이터를 최우선 사용한다.
+
+    일별 DB를 합산해서 월간 값을 만들지 않는다.
+    따라서 일별 누락이 있어도 월간 최종 합계는 영향을 받지 않는다.
+  */
+  const monthlyCandidates =
+    monthlyRows.filter(
+      (row) =>
+        String(row.month).slice(0, 7) ===
+        monthKey
+    );
+
+  if (monthlyCandidates.length > 0) {
+    const latestMonthlyKey =
+      monthlyCandidates.reduce(
+        (latest, row) =>
+          String(row.month) > latest
+            ? String(row.month)
+            : latest,
+        ""
+      );
+
+    const latestRows =
+      monthlyCandidates.filter(
+        (row) =>
+          String(row.month) ===
+          latestMonthlyKey
+      );
+
+    const deduped =
+      new Map<string, PlatformDbRow>();
+
+    for (const row of latestRows) {
+      deduped.set(
+        row.platformName,
+        row
+      );
+    }
+
+    return Array.from(
+      deduped.values()
+    );
+  }
+
+  /*
+    monthly 데이터가 없는 경우에만
+    일별 데이터를 플랫폼별로 합산해 fallback한다.
+
+    /api/daily와 DailyDashboard는 변경하지 않는다.
+  */
+  const dayRows =
+    dailyRows.filter(
+      (row) =>
+        String(row.month).slice(0, 7) ===
+        monthKey
+    );
+
+  const grouped =
+    new Map<string, PlatformDbRow>();
+
+  for (const row of dayRows) {
+    const existing =
+      grouped.get(
+        row.platformName
+      );
+
+    if (existing) {
+      existing.applications +=
+        row.applications;
+
+      existing.reservations +=
+        row.reservations;
+    } else {
+      grouped.set(
+        row.platformName,
+        {
+          ...row,
+          month: monthKey,
+        }
+      );
+    }
+  }
+
+  return Array.from(
+    grouped.values()
+  );
+}
+
+/* ========================================
+   월 데이터 생성
+======================================== */
+function buildMonthData(
+  month: string,
+  monthlyRows: PlatformDbRow[],
+  dailyRows: PlatformDbRow[],
+  conversionRows: ConversionDbRow[]
+) {
+  const platformRows =
+    getEffectivePlatformRows(
+      month,
+      monthlyRows,
+      dailyRows
+    );
+
+  const conversion =
+    conversionRows.find(
+      (row) =>
+        String(row.month).slice(0, 7) ===
+        String(month).slice(0, 7)
+    );
+
+  if (
+    platformRows.length === 0 &&
+    !conversion
+  ) {
+    return null;
+  }
+
+  /*
+    전체 합계 포함 플랫폼만
+    신청/예약 총합 계산
+  */
+
+  const totalRows =
+    platformRows.filter(
+      (row) =>
+        row.includeInTotal
+    );
+
+  const totalApplications =
+    totalRows.reduce(
+      (sum, row) =>
+        sum +
+        row.applications,
+      0
+    );
+
+  const totalReservations =
+    totalRows.reduce(
+      (sum, row) =>
+        sum +
+        row.reservations,
+      0
+    );
+
+  const reservationRate =
+    totalApplications > 0
+      ? (totalReservations /
+          totalApplications) *
+        100
+      : 0;
+
+  /*
+    상담/수술은 아직
+    월간 데이터 사용
+  */
+
+  const consultations =
+    conversion?.consultations ??
+    0;
+
+  const surgeries =
+    conversion?.surgeries ??
+    0;
+
+  const surgeryRate =
+    consultations > 0
+      ? (surgeries /
+          consultations) *
+        100
+      : 0;
+
+  /*
+    플랫폼별 전환율 차트
+  */
+
+  const platformStats =
+    platformRows
+      .filter(
+        (row) =>
+          row.includeInChannelChart
+      )
+      .map((row) => ({
+        name:
+          row.platformName,
+
+        applications:
+          row.applications,
+
+        reservations:
+          row.reservations,
+
+        rate:
+          row.applications > 0
+            ? (row.reservations /
+                row.applications) *
+              100
+            : 0,
+
+        sortOrder:
+          row.sortOrder,
+      }))
+      .sort(
+        (a, b) => {
+          /*
+            전환율 높은 순
+          */
+          if (
+            b.rate !==
+            a.rate
+          ) {
+            return (
+              b.rate -
+              a.rate
+            );
+          }
+
+          return (
+            a.sortOrder -
+            b.sortOrder
+          );
+        }
+      )
+      .map(
+        ({
+          sortOrder: _,
+          ...row
+        }) => row
+      );
+
+  return {
+    month,
+
+    totalApplications,
+    totalReservations,
+    reservationRate,
+
+    consultations,
+    surgeries,
+    surgeryRate,
+
+    platformStats,
+  };
+}
+
+/* ========================================
+   메인 대시보드 조회
+======================================== */
+
+export async function getDashboardData(
+  month: string
+) {
+  const previousMonth =
+    shiftMonth(
+      month,
+      -1
+    );
+
+  const lastYearMonth =
+    shiftMonth(
+      month,
+      -12
+    );
+
+  /*
+    조회 시작:
+    선택 월 12개월 전
+
+    조회 끝:
+    선택 월 다음달 1일 미만
+  */
+
+  const {
+    start:
+      queryStartDate,
+
+    next:
+      queryNextDate,
+  } =
+    getDashboardDateRange(
+      month
+    );
+
+  /*
+    월간 테이블은 month 컬럼이라
+    선택월까지 조회
+  */
+
+  const queryStartMonth =
+    shiftMonth(
+      month,
+      -12
+    );
+
+  const [
+    monthlyRows,
+    rawDailyRows,
+    conversionRows,
+    dailyConversionRows,
+    categoryConversionRows,
+    visitSourceRows,
+  ] =
+    await Promise.all([
+      /* ============================
+         기존 월간 플랫폼 데이터
+      ============================ */
+
+      db
+        .select({
+          month:
+            monthlyPlatformStats.month,
+
+          applications:
+            monthlyPlatformStats.applications,
+
+          reservations:
+            monthlyPlatformStats.reservations,
+
+          platformName:
+            platforms.name,
+
+          sortOrder:
+            platforms.sortOrder,
+
+          includeInTotal:
+            platforms.includeInTotal,
+
+          includeInChannelChart:
+            platforms.includeInChannelChart,
+        })
+        .from(
+          monthlyPlatformStats
+        )
+        .innerJoin(
+          platforms,
+          eq(
+            monthlyPlatformStats.platformId,
+            platforms.id
+          )
+        )
+        .where(
+          and(
+            gte(
+              monthlyPlatformStats.month,
+              queryStartMonth
+            ),
+
+            lte(
+              monthlyPlatformStats.month,
+              `${String(month).slice(0, 7)}-01`
+            )
+          )
+        )
+        .orderBy(
+          asc(
+            monthlyPlatformStats.month
+          )
+        ),
+
+      /* ============================
+         일별 플랫폼 원본
+
+         ★ 여기 날짜 범위 수정됨
+      ============================ */
+
+      db
+        .select({
+          date:
+            dailyPlatformStats.date,
+
+          applications:
+            dailyPlatformStats.applications,
+
+          reservations:
+            dailyPlatformStats.reservations,
+
+          platformName:
+            platforms.name,
+
+          sortOrder:
+            platforms.sortOrder,
+
+          includeInTotal:
+            platforms.includeInTotal,
+
+          includeInChannelChart:
+            platforms.includeInChannelChart,
+        })
+        .from(
+          dailyPlatformStats
+        )
+        .innerJoin(
+          platforms,
+          eq(
+            dailyPlatformStats.platformId,
+            platforms.id
+          )
+        )
+        .where(
+          and(
+            gte(
+              dailyPlatformStats.date,
+              queryStartDate
+            ),
+
+            lt(
+              dailyPlatformStats.date,
+              queryNextDate
+            )
+          )
+        )
+        .orderBy(
+          asc(
+            dailyPlatformStats.date
+          )
+        ),
+
+      /* ============================
+         상담 / 수술
+      ============================ */
+
+      db
+        .select({
+          month:
+            monthlyConversionStats.month,
+
+          consultations:
+            monthlyConversionStats.consultations,
+
+          surgeries:
+            monthlyConversionStats.surgeries,
+        })
+        .from(
+          monthlyConversionStats
+        )
+        .where(
+          and(
+            gte(
+              monthlyConversionStats.month,
+              queryStartMonth
+            ),
+
+            lte(
+              monthlyConversionStats.month,
+              `${String(month).slice(0, 7)}-01`
+            )
+          )
+        )
+        .orderBy(
+          asc(
+            monthlyConversionStats.month
+          )
+        ),
+
+      db
+        .select({
+          date: dailyConversionStats.date,
+          consultations: dailyConversionStats.consultations,
+          surgeries: dailyConversionStats.surgeries,
+        })
+        .from(dailyConversionStats)
+        .where(
+          and(
+            gte(dailyConversionStats.date, queryStartDate),
+            lt(dailyConversionStats.date, queryNextDate)
+          )
+        )
+        .orderBy(
+          asc(dailyConversionStats.date)
+        ),
+      db
+        .select({
+          date: dailyCategoryConversionStats.date,
+          category: dailyCategoryConversionStats.category,
+          consultations: dailyCategoryConversionStats.consultations,
+          surgeries: dailyCategoryConversionStats.surgeries,
+        })
+        .from(dailyCategoryConversionStats)
+        .where(
+          and(
+            gte(dailyCategoryConversionStats.date, queryStartDate),
+            lt(dailyCategoryConversionStats.date, queryNextDate)
+          )
+        )
+        .orderBy(
+          asc(dailyCategoryConversionStats.date)
+        ),
+      db
+        .select({
+          date: dailyVisitSources.date,
+          source: dailyVisitSources.source,
+          count: dailyVisitSources.count,
+        })
+        .from(dailyVisitSources)
+        .where(
+          and(
+            gte(dailyVisitSources.date, queryStartDate),
+            lt(dailyVisitSources.date, queryNextDate)
+          )
+        ),
+    ]);
+
+  /*
+    daily:
+
+    2026-08-01
+    2026-08-03
+    ...
+
+    ↓
+
+    month = 2026-08-01
+
+    형태로 변환
+  */
+
+  const dailyRows: PlatformDbRow[] =
+    rawDailyRows.map(
+      (row) => ({
+        month:
+          monthFromDate(
+            row.date
+          ),
+
+        date:
+          row.date,
+
+        applications:
+          row.applications,
+
+        reservations:
+          row.reservations,
+
+        platformName:
+          row.platformName,
+
+        sortOrder:
+          row.sortOrder,
+
+        includeInTotal:
+          row.includeInTotal,
+
+        includeInChannelChart:
+          row.includeInChannelChart,
+      })
+    );
+
+  /*
+    현재월
+  */
+
+  const current =
+    buildMonthData(
+      month,
+      monthlyRows,
+      dailyRows,
+      conversionRows
+    );
+
+  /*
+    전월
+  */
+
+  const previous =
+    buildMonthData(
+      previousMonth,
+      monthlyRows,
+      dailyRows,
+      conversionRows
+    );
+
+  /*
+    전년 동월
+  */
+
+  const lastYear =
+    buildMonthData(
+      lastYearMonth,
+      monthlyRows,
+      dailyRows,
+      conversionRows
+    );
+
+  /* ========================================
+     최근 12개월 추이
+  ======================================== */
+
+  const trendStart =
+    shiftMonth(
+      month,
+      -11
+    );
+
+  const trendMonths =
+    Array.from(
+      new Set([
+        ...monthlyRows.map(
+          (row) =>
+            row.month
+        ),
+
+        ...dailyRows.map(
+          (row) =>
+            row.month
+        ),
+
+        ...conversionRows.map(
+          (row) =>
+            row.month
+        ),
+      ])
+    )
+      .filter(
+        (trendMonth) =>
+          trendMonth >=
+            trendStart &&
+          trendMonth <=
+            month
+      )
+      .sort();
+
+  const monthlyTrend =
+    trendMonths.map(
+      (trendMonth) => {
+        const monthData =
+          buildMonthData(
+            trendMonth,
+            monthlyRows,
+            dailyRows,
+            conversionRows
+          );
+
+        return {
+          month:
+            trendMonth,
+
+          applications:
+            monthData
+              ?.totalApplications ??
+            0,
+
+          reservations:
+            monthData
+              ?.totalReservations ??
+            0,
+
+          consultations:
+            monthData
+              ?.consultations ??
+            0,
+
+          surgeries:
+            monthData
+              ?.surgeries ??
+            0,
+        };
+      }
+    );
+
+  /*
+    월별 실제 내원 경로
+
+    daily_visit_sources의 날짜별 데이터를
+    선택 월 기준으로 합산한다.
+
+    유튜브 표기 차이는 하나로 통합한다.
+  */
+  const visitSourceMap =
+    new Map<string, number>();
+
+  visitSourceRows
+    .filter(
+      (row) =>
+        String(
+          monthFromDate(
+            row.date
+          )
+        ).slice(0, 7) ===
+        String(month).slice(0, 7)
+    )
+    .forEach((row) => {
+      const rawSource =
+        String(
+          row.source ?? ""
+        ).trim();
+
+      const compactSource =
+        rawSource
+          .replace(/\s+/g, "")
+          .toLowerCase();
+
+      let normalizedSource =
+        rawSource;
+
+      if (
+        [
+          "유튜브",
+          "유투브",
+          "유튭",
+          "유트브",
+          "youtube",
+          "yt",
+        ].includes(
+          compactSource
+        )
+      ) {
+        normalizedSource =
+          "유튜브";
+      } else if (
+        [
+          "메타광고",
+          "매타광고",
+          "메타",
+          "매타",
+          "meta",
+          "meta광고",
+        ].includes(
+          compactSource
+        )
+      ) {
+        normalizedSource =
+          "메타광고";
+      }
+
+      if (!normalizedSource) {
+        return;
+      }
+
+      visitSourceMap.set(
+        normalizedSource,
+        (
+          visitSourceMap.get(
+            normalizedSource
+          ) ?? 0
+        ) + row.count
+      );
+    });
+
+  const monthlyVisitSources =
+    Array.from(
+      visitSourceMap.entries()
+    )
+      .map(
+        ([source, count]) => ({
+          source,
+          count,
+        })
+      )
+      .sort(
+        (a, b) =>
+          b.count - a.count
+      );
+
+  const totalVisitSourceCount =
+    monthlyVisitSources.reduce(
+      (sum, row) =>
+        sum + row.count,
+      0
+    );
+  const dailyConversions =
+    dailyConversionRows
+      .filter(
+        (row) =>
+          monthFromDate(row.date) === month
+      )
+      .map((row) => ({
+        date: row.date,
+        consultations: row.consultations,
+        surgeries: row.surgeries,
+        rate:
+          row.consultations > 0
+            ? (row.surgeries / row.consultations) * 100
+            : 0,
+      }))
+      .sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+  const categoryNames = [
+    "코",
+    "눈",
+    "리프팅",
+    "쁘띠",
+  ];
+
+  function buildCategoryConversions(
+    targetMonth: string
+  ) {
+    return categoryNames.map(
+      (category) => {
+        const rows =
+          categoryConversionRows.filter(
+            (row) =>
+              monthFromDate(
+                row.date
+              ) ===
+                targetMonth &&
+              row.category ===
+                category
+          );
+
+        const consultations =
+          rows.reduce(
+            (sum, row) =>
+              sum +
+              row.consultations,
+            0
+          );
+
+        const surgeries =
+          rows.reduce(
+            (sum, row) =>
+              sum +
+              row.surgeries,
+            0
+          );
+
+        const rate =
+          consultations > 0
+            ? (surgeries /
+                consultations) *
+              100
+            : 0;
+
+        return {
+          category,
+          consultations,
+          surgeries,
+          rate,
+        };
+      }
+    );
+  }
+
+  const categoryConversions =
+    buildCategoryConversions(
+      month
+    );
+
+  const previousCategoryConversions =
+    buildCategoryConversions(
+      previousMonth
+    );
+
+  const dailyCategoryConversions =
+    categoryConversionRows
+      .filter(
+        (row) =>
+          monthFromDate(row.date) === month
+      )
+      .map((row) => ({
+        date: row.date,
+        category: row.category,
+        consultations: row.consultations,
+        surgeries: row.surgeries,
+        rate:
+          row.consultations > 0
+            ? (row.surgeries / row.consultations) * 100
+            : 0,
+      }))
+      .sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+  return {
+    selectedMonth:
+      month,
+
+    current,
+    previous,
+    lastYear,
+
+    monthlyTrend,
+
+    monthlyVisitSources,
+    totalVisitSourceCount,
+    dailyConversions,
+    categoryConversions,
+    previousCategoryConversions,
+    dailyCategoryConversions,
+  };
+}
+
+/* ========================================
+   선택 가능한 월 목록
+======================================== */
+
+export async function getAvailableMonths() {
+  const [
+    monthlyRows,
+    dailyRows,
+    conversionRows,
+  ] =
+    await Promise.all([
+      /*
+        기존 월간
+      */
+
+      db
+        .select({
+          month:
+            monthlyPlatformStats.month,
+        })
+        .from(
+          monthlyPlatformStats
+        ),
+
+      /*
+        일별 데이터 월
+      */
+
+      db
+        .select({
+          date:
+            dailyPlatformStats.date,
+        })
+        .from(
+          dailyPlatformStats
+        ),
+
+      /*
+        상담/수술 월
+      */
+
+      db
+        .select({
+          month:
+            monthlyConversionStats.month,
+        })
+        .from(
+          monthlyConversionStats
+        ),
+    ]);
+
+  return Array.from(
+    new Set([
+      ...monthlyRows.map(
+        (row) =>
+          String(row.month).slice(0, 7)
+      ),
+
+      ...dailyRows.map(
+        (row) =>
+          String(
+            monthFromDate(
+              row.date
+            )
+          ).slice(0, 7)
+      ),
+
+      ...conversionRows.map(
+        (row) =>
+          String(row.month).slice(0, 7)
+      ),
+    ])
+  ).sort(
+    (a, b) =>
+      b.localeCompare(a)
+  );
+}
+
+===== DASHBOARD =====
+"use client";
+
+import CategoryTrendChart from "@/components/CategoryTrendChart";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarDays,
+  Loader2,
+  Settings,
+  TrendingUp,
+} from "lucide-react";
+
+import { useState } from "react";
+
+import DailyDashboard from "@/components/DailyDashboard";
+
+type PlatformStat = {
+  name: string;
+  applications: number;
+  reservations: number;
+  rate: number;
+};
+
+type MonthData = {
+  month: string;
+  totalApplications: number;
+  totalReservations: number;
+  reservationRate: number;
+  consultations: number;
+  surgeries: number;
+  surgeryRate: number;
+  platformStats: PlatformStat[];
+};
+
+type TrendRow = {
+  month: string;
+  applications: number;
+  reservations: number;
+  consultations: number;
+  surgeries: number;
+};
+
+type DashboardData = {
+  selectedMonth: string;
+  current: MonthData | null;
+  previous: MonthData | null;
+  lastYear: MonthData | null;
+  monthlyTrend: TrendRow[];
+  monthlyVisitSources: { source: string; count: number }[];
+  totalVisitSourceCount: number;
+  dailyConversions: {
+    date: string;
+    consultations: number;
+    surgeries: number;
+    rate: number;
+  }[];
+
+  categoryConversions: {
+    category: string;
+    consultations: number;
+    surgeries: number;
+    rate: number;
+  }[];
+
+  previousCategoryConversions: {
+    category: string;
+    consultations: number;
+    surgeries: number;
+    rate: number;
+  }[];
+
+  dailyCategoryConversions: {
+    date: string;
+    category: string;
+    consultations: number;
+    surgeries: number;
+    rate: number;
+  }[];
+};
+
+function formatMonth(month: string) {
+  const [year, monthNumber] = month.split("-");
+
+  return `${year}년 ${Number(monthNumber)}월`;
+}
+
+function formatShortMonth(month: string) {
+  const [year, monthNumber] = month.split("-");
+
+  return `${year.slice(2)}.${String(
+    Number(monthNumber)
+  ).padStart(2, "0")}`;
+}
+
+function formatInteger(
+  value: number | null | undefined
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "-";
+  }
+
+  return value.toLocaleString("ko-KR");
+}
+
+function formatPercent(
+  value: number | null | undefined
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "-";
+  }
+
+  return `${value.toFixed(2)}%`;
+}
+
+function calculateChange(
+  current: number | null | undefined,
+  comparison: number | null | undefined
+) {
+  if (
+    current === null ||
+    current === undefined ||
+    comparison === null ||
+    comparison === undefined ||
+    comparison === 0
+  ) {
+    return null;
+  }
+
+  return (
+    ((current - comparison) /
+      comparison) *
+    100
+  );
+}
+
+function calculatePointChange(
+  current: number | null | undefined,
+  comparison: number | null | undefined
+) {
+  if (
+    current === null ||
+    current === undefined ||
+    comparison === null ||
+    comparison === undefined
+  ) {
+    return null;
+  }
+
+  return current - comparison;
+}
+
+function ChangeBadge({
+  value,
+  unit,
+}: {
+  value: number | null;
+  unit: "%" | "%p";
+}) {
+  if (value === null) {
+    return (
+      <span className="text-sm font-semibold text-zinc-400">
+        -
+      </span>
+    );
+  }
+
+  const positive = value >= 0;
+
+  return (
+    <span
+      className={`flex items-center gap-1 text-sm font-bold ${
+        positive
+          ? "text-emerald-600"
+          : "text-red-500"
+      }`}
+    >
+      {positive ? (
+        <ArrowUpRight size={14} />
+      ) : (
+        <ArrowDownRight size={14} />
+      )}
+
+      {positive ? "+" : ""}
+      {value.toFixed(
+        unit === "%p" ? 2 : 1
+      )}
+      {unit}
+    </span>
+  );
+}
+
+function ComparisonLegend() {
+  return (
+    <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-zinc-500">
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-sm bg-blue-600" />
+        <span>이번 달</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-sm bg-zinc-400" />
+        <span>전월</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 rounded-sm bg-violet-300" />
+        <span>전년 동월</span>
+      </div>
+    </div>
+  );
+}
+
+function BarItem({
+  value,
+  max,
+  barClass,
+  textClass,
+  label,
+}: {
+  value: number | null;
+  max: number;
+  barClass: string;
+  textClass: string;
+  label: string;
+}) {
+  if (value === null) {
+    return (
+      <div className="flex w-[28%] flex-col items-center justify-end">
+        <div className="mb-1 min-h-[34px] text-center">
+          <span className="block text-xs font-semibold text-zinc-300">
+            -
+          </span>
+
+          <span className="block whitespace-nowrap text-[10px] font-medium text-zinc-400">
+            {label}
+          </span>
+        </div>
+
+        <div className="h-2 w-full rounded-t-md bg-zinc-100" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-[28%] flex-col items-center justify-end">
+      <div className="mb-1 min-h-[34px] text-center leading-tight">
+        <span
+          className={`block text-xs font-bold ${textClass}`}
+        >
+          {value.toLocaleString("ko-KR")}
+        </span>
+
+        <span className="mt-0.5 block whitespace-nowrap text-[10px] font-medium text-zinc-400">
+          {label}
+        </span>
+      </div>
+
+      <div
+        className={`w-full rounded-t-md ${barClass}`}
+        style={{
+          height: `${Math.max(
+            (value / max) * 195,
+            8
+          )}px`,
+        }}
+      />
+    </div>
+  );
+}
+
+function VolumeChart({
+  current,
+  previous,
+  lastYear,
+}: {
+  current: MonthData;
+  previous: MonthData | null;
+  lastYear: MonthData | null;
+}) {
+  const rows = [
+    {
+      name: "총 신청",
+      current:
+        current.totalApplications,
+      previous:
+        previous?.totalApplications ??
+        null,
+      lastYear:
+        lastYear?.totalApplications ??
+        null,
+    },
+    {
+      name: "총 예약",
+      current:
+        current.totalReservations,
+      previous:
+        previous?.totalReservations ??
+        null,
+      lastYear:
+        lastYear?.totalReservations ??
+        null,
+    },
+    {
+      name: "총 상담",
+      current:
+        current.consultations,
+      previous:
+        previous?.consultations ??
+        null,
+      lastYear:
+        lastYear?.consultations ??
+        null,
+    },
+    {
+      name: "수술 전환",
+      current:
+        current.surgeries,
+      previous:
+        previous?.surgeries ??
+        null,
+      lastYear:
+        lastYear?.surgeries ??
+        null,
+    },
+  ];
+
+  const maxValue = Math.max(
+    ...rows.flatMap((row) => [
+      row.current,
+      row.previous ?? 0,
+      row.lastYear ?? 0,
+    ]),
+    1
+  );
+
+  return (
+    <div className="mt-5">
+      <ComparisonLegend />
+
+      <div className="flex h-[295px] items-end gap-6 border-b border-zinc-200 px-4">
+        {rows.map((row) => (
+          <div
+            key={row.name}
+            className="flex h-full flex-1 flex-col justify-end"
+          >
+            <div className="flex flex-1 items-end justify-center gap-2">
+              <BarItem
+                value={row.current}
+                max={maxValue}
+                barClass="bg-blue-600"
+                textClass="text-blue-700"
+                label={formatShortMonth(
+                  current.month
+                )}
+              />
+
+              <BarItem
+                value={row.previous}
+                max={maxValue}
+                barClass="bg-zinc-400"
+                textClass="text-zinc-600"
+                label={
+                  previous
+                    ? formatShortMonth(
+                        previous.month
+                      )
+                    : "-"
+                }
+              />
+
+              <BarItem
+                value={row.lastYear}
+                max={maxValue}
+                barClass="bg-violet-300"
+                textClass="text-violet-700"
+                label={
+                  lastYear
+                    ? formatShortMonth(
+                        lastYear.month
+                      )
+                    : "-"
+                }
+              />
+            </div>
+
+            <div className="mt-3 h-10 text-center text-sm font-semibold">
+              {row.name}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RateBar({
+  label,
+  value,
+  monthLabel,
+  barClass,
+  valueClass,
+}: {
+  label: string;
+  value: number | null;
+  monthLabel: string;
+  barClass: string;
+  valueClass: string;
+}) {
+  return (
+    <div className="grid grid-cols-[70px_1fr_75px] items-center gap-3">
+      <span className="text-xs text-zinc-500">
+        {label}
+      </span>
+
+      <div className="h-7 overflow-hidden rounded-md bg-zinc-100">
+        {value !== null && (
+          <div
+            className={`h-full rounded-md ${barClass}`}
+            style={{
+              width: `${Math.min(
+                Math.max(value, 0),
+                100
+              )}%`,
+            }}
+          />
+        )}
+      </div>
+
+      <div className="text-right">
+        <span
+          className={`block text-xs font-bold ${valueClass}`}
+        >
+          {value === null
+            ? "-"
+            : `${value.toFixed(2)}%`}
+        </span>
+
+        <span className="block whitespace-nowrap text-[10px] text-zinc-400">
+          {monthLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ConversionChart({
+  current,
+  previous,
+  lastYear,
+}: {
+  current: MonthData;
+  previous: MonthData | null;
+  lastYear: MonthData | null;
+}) {
+  const rows = [
+    {
+      name: "예약 전환율",
+      current:
+        current.reservationRate,
+      previous:
+        previous?.reservationRate ??
+        null,
+      lastYear:
+        lastYear?.reservationRate ??
+        null,
+    },
+    {
+      name:
+        "상담 → 수술 전환율",
+      current:
+        current.surgeryRate,
+      previous:
+        previous?.surgeryRate ??
+        null,
+      lastYear:
+        lastYear?.surgeryRate ??
+        null,
+    },
+  ];
+
+  return (
+    <div className="mt-5">
+      <ComparisonLegend />
+
+      <div className="space-y-7">
+        {rows.map((row) => (
+          <div key={row.name}>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm font-bold">
+                {row.name}
+              </span>
+
+              <span className="text-xs text-zinc-400">
+                0 ~ 100%
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <RateBar
+                label="이번 달"
+                value={row.current}
+                monthLabel={formatShortMonth(
+                  current.month
+                )}
+                barClass="bg-blue-600"
+                valueClass="text-blue-700"
+              />
+
+              <RateBar
+                label="전월"
+                value={row.previous}
+                monthLabel={
+                  previous
+                    ? formatShortMonth(
+                        previous.month
+                      )
+                    : "-"
+                }
+                barClass="bg-zinc-400"
+                valueClass="text-zinc-600"
+              />
+
+              <RateBar
+                label="전년 동월"
+                value={row.lastYear}
+                monthLabel={
+                  lastYear
+                    ? formatShortMonth(
+                        lastYear.month
+                      )
+                    : "-"
+                }
+                barClass="bg-violet-300"
+                valueClass="text-violet-700"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({
+  data,
+}: {
+  data: TrendRow[];
+}) {
+  if (data.length === 0) {
+    return (
+      <div className="mt-5 flex h-[280px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+        월별 누적 데이터가 없습니다.
+      </div>
+    );
+  }
+
+  if (data.length === 1) {
+    const item = data[0];
+
+    return (
+      <div className="mt-5 grid h-[280px] place-items-center rounded-xl bg-zinc-50">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-zinc-500">
+            {formatMonth(item.month)}
+          </p>
+
+          <div className="mt-4 flex gap-8">
+            <div>
+              <p className="text-3xl font-bold text-blue-600">
+                {item.applications.toLocaleString(
+                  "ko-KR"
+                )}
+              </p>
+
+              <p className="mt-1 text-xs text-zinc-500">
+                신청
+              </p>
+            </div>
+
+            <div>
+              <p className="text-3xl font-bold text-violet-600">
+                {item.reservations.toLocaleString(
+                  "ko-KR"
+                )}
+              </p>
+
+              <p className="mt-1 text-xs text-zinc-500">
+                예약
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const width = 800;
+  const height = 270;
+  const left = 45;
+  const right = 20;
+  const top = 20;
+  const bottom = 40;
+
+  const chartWidth =
+    width - left - right;
+
+  const chartHeight =
+    height - top - bottom;
+
+  const maxValue = Math.max(
+    ...data.flatMap((item) => [
+      item.applications,
+      item.reservations,
+    ]),
+    1
+  );
+
+  const roundedMax =
+    Math.ceil(maxValue / 100) *
+    100;
+
+  const getX = (
+    index: number
+  ) =>
+    left +
+    (index /
+      (data.length - 1)) *
+      chartWidth;
+
+  const getY = (
+    value: number
+  ) =>
+    top +
+    chartHeight -
+    (value / roundedMax) *
+      chartHeight;
+
+  const applicationPoints =
+    data
+      .map(
+        (item, index) =>
+          `${getX(
+            index
+          )},${getY(
+            item.applications
+          )}`
+      )
+      .join(" ");
+
+  const reservationPoints =
+    data
+      .map(
+        (item, index) =>
+          `${getX(
+            index
+          )},${getY(
+            item.reservations
+          )}`
+      )
+      .join(" ");
+
+  const ticks = [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1,
+  ].map((ratio) =>
+    Math.round(
+      roundedMax * ratio
+    )
+  );
+
+  return (
+    <div className="mt-5 w-full overflow-hidden">
+      <div className="mb-4 flex gap-5 text-xs text-zinc-500">
+        <div className="flex items-center gap-2">
+          <span className="h-[3px] w-5 bg-blue-600" />
+          신청
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="h-[3px] w-5 bg-violet-500" />
+          예약
+        </div>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-[280px] w-full"
+        preserveAspectRatio="none"
+      >
+        {ticks.map((tick) => {
+          const y =
+            getY(tick);
+
+          return (
+            <g key={tick}>
+              <line
+                x1={left}
+                y1={y}
+                x2={
+                  width - right
+                }
+                y2={y}
+                stroke="#e4e4e7"
+                strokeWidth="1"
+              />
+
+              <text
+                x={left - 10}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="11"
+                fill="#71717a"
+              >
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        <polyline
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={
+            applicationPoints
+          }
+        />
+
+        <polyline
+          fill="none"
+          stroke="#8b5cf6"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={
+            reservationPoints
+          }
+        />
+
+        {data.map(
+          (item, index) => (
+            <g key={item.month}>
+              <circle
+                cx={getX(
+                  index
+                )}
+                cy={getY(
+                  item.applications
+                )}
+                r="5"
+                fill="#2563eb"
+              />
+
+              <circle
+                cx={getX(
+                  index
+                )}
+                cy={getY(
+                  item.reservations
+                )}
+                r="5"
+                fill="#8b5cf6"
+              />
+
+              <text
+                x={getX(
+                  index
+                )}
+                y={
+                  height - 10
+                }
+                textAnchor="middle"
+                fontSize="12"
+                fill="#71717a"
+              >
+                {formatShortMonth(
+                  item.month
+                )}
+              </text>
+            </g>
+          )
+        )}
+      </svg>
+    </div>
+  );
+}
+
+function PlatformChart({
+  current,
+  previous,
+  lastYear,
+}: {
+  current: PlatformStat[];
+  previous: PlatformStat[];
+  lastYear: PlatformStat[];
+}) {
+  const platformNames = Array.from(
+    new Set([
+      ...current.map((item) => item.name),
+      ...previous.map((item) => item.name),
+      ...lastYear.map((item) => item.name),
+    ])
+  );
+
+  if (platformNames.length === 0) {
+    return (
+      <div className="mt-7 flex h-[250px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+        플랫폼 데이터가 없습니다.
+      </div>
+    );
+  }
+
+  const getStat = (
+    rows: PlatformStat[],
+    name: string
+  ) =>
+    rows.find(
+      (item) => item.name === name
+    );
+
+  const periods = [
+    {
+      label: "이번 달",
+      rows: current,
+      barClass: "bg-blue-600",
+      textClass: "text-blue-700",
+    },
+    {
+      label: "전월",
+      rows: previous,
+      barClass: "bg-zinc-400",
+      textClass: "text-zinc-700",
+    },
+    {
+      label: "전년 동월",
+      rows: lastYear,
+      barClass: "bg-violet-300",
+      textClass: "text-violet-700",
+    },
+  ];
+
+  return (
+    <div className="mt-7 grid gap-5 md:grid-cols-2">
+      {platformNames.map((name) => (
+        <div
+          key={name}
+          className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-4"
+        >
+          <h3 className="mb-4 font-black text-zinc-900">
+            {name}
+          </h3>
+
+          <div className="space-y-3">
+            {periods.map((period) => {
+              const stat =
+                getStat(
+                  period.rows,
+                  name
+                );
+
+              const rate =
+                stat?.rate ?? 0;
+
+              const hasData =
+                Boolean(stat);
+
+              return (
+                <div
+                  key={period.label}
+                  className="grid grid-cols-[64px_1fr_64px] items-center gap-3"
+                >
+                  <span className="text-xs font-semibold text-zinc-500">
+                    {period.label}
+                  </span>
+
+                  <div className="h-6 overflow-hidden rounded-md bg-zinc-100">
+                    {hasData && (
+                      <div
+                        className={`h-full rounded-md ${period.barClass}`}
+                        style={{
+                          width: `${Math.min(
+                            Math.max(
+                              rate,
+                              rate > 0 ? 1 : 0
+                            ),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <span
+                    className={`text-right text-xs font-black ${period.textClass}`}
+                  >
+                    {hasData
+                      ? `${rate.toFixed(2)}%`
+                      : "-"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlatformDetailTable({
+  current,
+  previous,
+}: {
+  current: MonthData | null | undefined;
+  previous: MonthData | null | undefined;
+}) {
+  const normalizeName = (
+    value: string
+  ) =>
+    String(value ?? "")
+      .trim()
+      .replace(/\s+/g, "");
+
+  const currentRows =
+    current?.platformStats ?? [];
+
+  const previousRows =
+    previous?.platformStats ?? [];
+
+  const currentMap =
+    new Map(
+      currentRows.map(
+        (row) => [
+          normalizeName(row.name),
+          row,
+        ]
+      )
+    );
+
+  const previousMap =
+    new Map(
+      previousRows.map(
+        (row) => [
+          normalizeName(row.name),
+          row,
+        ]
+      )
+    );
+
+  const orderedNames =
+    Array.from(
+      new Set([
+        ...currentRows.map(
+          (row) =>
+            normalizeName(row.name)
+        ),
+        ...previousRows.map(
+          (row) =>
+            normalizeName(row.name)
+        ),
+      ])
+    );
+
+  const rows =
+    orderedNames.map(
+      (key) => {
+        const now =
+          currentMap.get(key);
+
+        const before =
+          previousMap.get(key);
+
+        const name =
+          now?.name ??
+          before?.name ??
+          key;
+
+        const currentApplications =
+          now?.applications ?? 0;
+
+        const previousApplications =
+          before?.applications ?? 0;
+
+        const currentReservations =
+          now?.reservations ?? 0;
+
+        const previousReservations =
+          before?.reservations ?? 0;
+
+        return {
+          name,
+
+          currentApplications,
+          previousApplications,
+
+          applicationDelta:
+            currentApplications -
+            previousApplications,
+
+          currentReservations,
+          previousReservations,
+
+          reservationDelta:
+            currentReservations -
+            previousReservations,
+
+          rate:
+            currentApplications > 0
+              ? (
+                  currentReservations /
+                  currentApplications
+                ) * 100
+              : 0,
+        };
+      }
+    );
+
+  const Delta = ({
+    value,
+  }: {
+    value: number;
+  }) => {
+    if (value > 0) {
+      return (
+        <span className="font-bold text-red-500">
+          ▲ {value.toLocaleString()}
+        </span>
+      );
+    }
+
+    if (value < 0) {
+      return (
+        <span className="font-bold text-blue-600">
+          ▼ {Math.abs(
+            value
+          ).toLocaleString()}
+        </span>
+      );
+    }
+
+    return (
+      <span className="font-semibold text-zinc-400">
+        -
+      </span>
+    );
+  };
+
+  return (
+    <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-zinc-950">
+          플랫폼별 상세 실적
+        </h2>
+
+        <p className="mt-1 text-sm text-zinc-500">
+          전월 대비 플랫폼별 신청 · 예약 실적
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-xl bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-400">
+          등록된 플랫폼 실적이 없습니다.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <tr className="border-y border-zinc-200 bg-zinc-50 text-zinc-600">
+                <th className="px-4 py-3 text-left font-semibold">
+                  플랫폼
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  전월 신청
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 신청
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  증감
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  전월 예약
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 예약
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  증감
+                </th>
+
+                <th className="px-4 py-3 text-right font-semibold">
+                  당월 전환율
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map(
+                (row) => (
+                  <tr
+                    key={row.name}
+                    className="border-b border-zinc-100 transition hover:bg-zinc-50"
+                  >
+                    <td className="px-4 py-4 font-bold text-zinc-900">
+                      {row.name}
+                    </td>
+
+                    <td className="px-4 py-4 text-right text-zinc-500">
+                      {row.previousApplications.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-zinc-950">
+                      {row.currentApplications.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right">
+                      <Delta
+                        value={
+                          row.applicationDelta
+                        }
+                      />
+                    </td>
+
+                    <td className="px-4 py-4 text-right text-zinc-500">
+                      {row.previousReservations.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-zinc-950">
+                      {row.currentReservations.toLocaleString()}
+                    </td>
+
+                    <td className="px-4 py-4 text-right">
+                      <Delta
+                        value={
+                          row.reservationDelta
+                        }
+                      />
+                    </td>
+
+                    <td className="px-4 py-4 text-right font-bold text-blue-600">
+                      {row.rate.toFixed(
+                        1
+                      )}
+                      %
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
+export default function DashboardClient({
+  data,
+  availableMonths,
+}: {
+  data: DashboardData;
+  availableMonths: string[];
+}) {
+  const [selectedCategoryTrend, setSelectedCategoryTrend] =
+    useState("코");
+
+  const [
+    dashboardData,
+    setDashboardData,
+  ] = useState<DashboardData>(
+    data
+  );
+
+  const [
+    changingMonth,
+    setChangingMonth,
+  ] = useState(false);
+
+  /*
+    월간 / 일별 보기
+  */
+  const [
+    viewMode,
+    setViewMode,
+  ] = useState<
+    "monthly" | "daily"
+  >("monthly");
+
+  const current =
+    dashboardData.current;
+
+  async function changeMonth(
+    month: string
+  ) {
+    if (
+      changingMonth ||
+      month ===
+        dashboardData.selectedMonth
+    ) {
+      return;
+    }
+
+    setChangingMonth(true);
+
+    try {
+      const response =
+        await fetch(
+          `/api/dashboard?month=${encodeURIComponent(
+            month
+          )}`,
+          {
+            cache: "no-store",
+          }
+        );
+
+      const result =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !result.ok
+      ) {
+        throw new Error(
+          result.message ??
+            "조회 실패"
+        );
+      }
+
+      setDashboardData(
+        result.data
+      );
+
+      window.history.replaceState(
+        null,
+        "",
+        `/?month=${encodeURIComponent(
+          month
+        )}`
+      );
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        "월 데이터를 불러오지 못했습니다."
+      );
+    } finally {
+      setChangingMonth(false);
+    }
+  }
+
+  if (!current) {
+    return (
+      <main className="min-h-screen bg-[#f6f7f9] p-10">
+        <div className="mx-auto max-w-[1000px] rounded-2xl bg-white p-10 text-center">
+          데이터가 없습니다.
+        </div>
+      </main>
+    );
+  }
+
+  const previous =
+    dashboardData.previous;
+
+  const lastYear =
+    dashboardData.lastYear;
+
+  const kpis = [
+    {
+      title: "총 신청",
+
+      value:
+        formatInteger(
+          current.totalApplications
+        ),
+
+      previousValue:
+        formatInteger(
+          previous?.totalApplications
+        ),
+
+      lastYearValue:
+        formatInteger(
+          lastYear?.totalApplications
+        ),
+
+      mom: calculateChange(
+        current.totalApplications,
+        previous?.totalApplications
+      ),
+
+      yoy: calculateChange(
+        current.totalApplications,
+        lastYear?.totalApplications
+      ),
+
+      unit: "%" as const,
+    },
+
+    {
+      title: "총 예약",
+
+      value:
+        formatInteger(
+          current.totalReservations
+        ),
+
+      previousValue:
+        formatInteger(
+          previous?.totalReservations
+        ),
+
+      lastYearValue:
+        formatInteger(
+          lastYear?.totalReservations
+        ),
+
+      mom: calculateChange(
+        current.totalReservations,
+        previous?.totalReservations
+      ),
+
+      yoy: calculateChange(
+        current.totalReservations,
+        lastYear?.totalReservations
+      ),
+
+      unit: "%" as const,
+    },
+
+    {
+      title:
+        "예약 전환율",
+
+      value:
+        formatPercent(
+          current.reservationRate
+        ),
+
+      previousValue:
+        formatPercent(
+          previous?.reservationRate
+        ),
+
+      lastYearValue:
+        formatPercent(
+          lastYear?.reservationRate
+        ),
+
+      mom:
+        calculatePointChange(
+          current.reservationRate,
+          previous?.reservationRate
+        ),
+
+      yoy:
+        calculatePointChange(
+          current.reservationRate,
+          lastYear?.reservationRate
+        ),
+
+      unit: "%p" as const,
+    },
+
+    {
+      title: "총 상담",
+
+      value:
+        formatInteger(
+          current.consultations
+        ),
+
+      previousValue:
+        formatInteger(
+          previous?.consultations
+        ),
+
+      lastYearValue:
+        formatInteger(
+          lastYear?.consultations
+        ),
+
+      mom: calculateChange(
+        current.consultations,
+        previous?.consultations
+      ),
+
+      yoy: calculateChange(
+        current.consultations,
+        lastYear?.consultations
+      ),
+
+      unit: "%" as const,
+    },
+
+    {
+      title: "수술 전환",
+
+      value:
+        formatInteger(
+          current.surgeries
+        ),
+
+      previousValue:
+        formatInteger(
+          previous?.surgeries
+        ),
+
+      lastYearValue:
+        formatInteger(
+          lastYear?.surgeries
+        ),
+
+      mom: calculateChange(
+        current.surgeries,
+        previous?.surgeries
+      ),
+
+      yoy: calculateChange(
+        current.surgeries,
+        lastYear?.surgeries
+      ),
+
+      unit: "%" as const,
+    },
+
+    {
+      title:
+        "상담 → 수술 전환율",
+
+      value:
+        formatPercent(
+          current.surgeryRate
+        ),
+
+      previousValue:
+        formatPercent(
+          previous?.surgeryRate
+        ),
+
+      lastYearValue:
+        formatPercent(
+          lastYear?.surgeryRate
+        ),
+
+      mom:
+        calculatePointChange(
+          current.surgeryRate,
+          previous?.surgeryRate
+        ),
+
+      yoy:
+        calculatePointChange(
+          current.surgeryRate,
+          lastYear?.surgeryRate
+        ),
+
+      unit: "%p" as const,
+    },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#f6f7f9] text-zinc-950">
+      <div className="mx-auto max-w-[1500px] px-6 py-8 lg:px-10">
+        {/* HEADER */}
+
+        <header className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+          <div>
+            <p className="mb-1 text-sm font-semibold text-blue-600">
+              MIHO PERFORMANCE
+            </p>
+
+            <h1 className="text-3xl font-bold">
+              미호성형외과 실적 대시보드
+            </h1>
+
+            <p className="mt-2 text-sm text-zinc-500">
+              예약 · 상담 · 수술 전환 현황을 한눈에 확인합니다.
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-500">
+              <span className="font-semibold text-zinc-400">
+                색상 기준
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                현재 / 핵심
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
+                전년 동월
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-zinc-400" />
+                전월
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                개선
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                하락
+              </div>
+            </div>
+          </div>
+
+          {/* 관리자 바로가기 */}
+          <a
+            href="/login"
+            className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <Settings size={17} />
+            관리자
+          </a>
+
+          {/* 월 선택 */}
+
+          <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+            <CalendarDays
+              size={17}
+              className="text-blue-600"
+            />
+
+            <select
+              value={
+                dashboardData.selectedMonth
+              }
+              disabled={
+                changingMonth
+              }
+              onChange={(event) =>
+                void changeMonth(
+                  event.target.value
+                )
+              }
+              className="cursor-pointer bg-transparent text-sm font-semibold outline-none disabled:cursor-wait"
+            >
+              {availableMonths.map(
+                (month) => (
+                  <option
+                    key={month}
+                    value={month}
+                  >
+                    {formatMonth(
+                      month
+                    )}
+                  </option>
+                )
+              )}
+            </select>
+
+            {changingMonth && (
+              <Loader2
+                size={16}
+                className="animate-spin text-blue-600"
+              />
+            )}
+          </div>
+        </header>
+
+        {/* 월간 / 일별 탭 */}
+
+        <div className="mb-6 flex w-fit rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() =>
+              setViewMode(
+                "monthly"
+              )
+            }
+            className={`rounded-lg px-5 py-2.5 text-sm font-bold transition ${
+              viewMode ===
+              "monthly"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+            }`}
+          >
+            월간 보기
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setViewMode(
+                "daily"
+              )
+            }
+            className={`rounded-lg px-5 py-2.5 text-sm font-bold transition ${
+              viewMode ===
+              "daily"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+            }`}
+          >
+            일별 보기
+          </button>
+        </div>
+
+        {/* =========================
+            월간 대시보드
+        ========================= */}
+
+        {viewMode ===
+        "monthly" ? (
+          <>
+            {/* 핵심 비교 / 전환율 */}
+
+            <section className="mb-6 grid gap-6 xl:grid-cols-2">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  핵심 실적 비교
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  이번 달 · 전월 · 전년 동월
+                </p>
+
+                <VolumeChart
+                  current={
+                    current
+                  }
+                  previous={
+                    previous
+                  }
+                  lastYear={
+                    lastYear
+                  }
+                />
+              </article>
+
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  전환율 비교
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  예약 전환율과 상담 → 수술 전환율
+                </p>
+
+                <ConversionChart
+                  current={
+                    current
+                  }
+                  previous={
+                    previous
+                  }
+                  lastYear={
+                    lastYear
+                  }
+                />
+              </article>
+            </section>
+
+            {/* KPI */}
+
+            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {kpis.map(
+                (kpi) => (
+                  <article
+                    key={
+                      kpi.title
+                    }
+                    className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+                  >
+                    <div className="mb-5 flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-zinc-500">
+                          {
+                            kpi.title
+                          }
+                        </p>
+
+                        <p className="mt-2 text-3xl font-bold">
+                          {
+                            kpi.value
+                          }
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                        <TrendingUp
+                          size={
+                            19
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex justify-between">
+                        <div className="flex gap-2">
+                          <span className="text-sm text-zinc-500">
+                            전월
+                          </span>
+
+                          <strong className="text-sm">
+                            {
+                              kpi.previousValue
+                            }
+                          </strong>
+                        </div>
+
+                        <ChangeBadge
+                          value={
+                            kpi.mom
+                          }
+                          unit={
+                            kpi.unit
+                          }
+                        />
+                      </div>
+
+                      <div className="flex justify-between">
+                        <div className="flex gap-2">
+                          <span className="text-sm text-zinc-500">
+                            전년 동월
+                          </span>
+
+                          <strong className="text-sm text-violet-700">
+                            {
+                              kpi.lastYearValue
+                            }
+                          </strong>
+                        </div>
+
+                        <ChangeBadge
+                          value={
+                            kpi.yoy
+                          }
+                          unit={
+                            kpi.unit
+                          }
+                        />
+                      </div>
+                    </div>
+                  </article>
+                )
+              )}
+            </section>
+
+            {/* 월별 추이 / 플랫폼 */}
+
+            <section className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  월별 신청 · 예약 추이
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  선택한 월 기준 최근 12개월
+                </p>
+
+                <TrendChart
+                  data={
+                    dashboardData.monthlyTrend
+                  }
+                />
+
+                {(() => {
+                  const rows =
+                    dashboardData.dailyConversions ?? [];
+
+                  const dailyConsultations =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum + row.consultations,
+                      0
+                    );
+
+                  const dailySurgeries =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum + row.surgeries,
+                      0
+                    );
+
+                  const hasDailyConversionData =
+                    rows.length > 0;
+
+                  const totalConsultations =
+                    hasDailyConversionData
+                      ? dailyConsultations
+                      : dashboardData.current?.consultations ?? 0;
+
+                  const totalSurgeries =
+                    hasDailyConversionData
+                      ? dailySurgeries
+                      : dashboardData.current?.surgeries ?? 0;
+
+                  const totalRate =
+                    totalConsultations > 0
+                      ? (totalSurgeries /
+                          totalConsultations) *
+                        100
+                      : 0;
+
+                  return (
+                    <div className="mt-8 border-t border-zinc-100 pt-6">
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <h3 className="font-black text-zinc-900">
+                            일별 상담 · 수술 현황
+                          </h3>
+
+                          <p className="mt-1 text-xs text-zinc-500">
+                            선택 월 기준 상담량 대비 수술량
+                          </p>
+                        </div>
+
+                        <a
+                          href="/admin/conversion"
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                        >
+                          입력하기 →
+                        </a>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            월 상담
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {totalConsultations.toLocaleString()}
+                            <span className="ml-1 text-sm text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            월 수술
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {totalSurgeries.toLocaleString()}
+                            <span className="ml-1 text-sm text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-blue-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-blue-600">
+                            상담 대비 수술 비율
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-blue-700">
+                            {totalRate.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {rows.length > 0 ? (
+                        <div className="mt-5 max-h-[330px] overflow-auto rounded-xl border border-zinc-100">
+                          <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-zinc-50 text-xs text-zinc-500">
+                              <tr>
+                                <th className="px-4 py-3 text-left font-bold">
+                                  날짜
+                                </th>
+
+                                <th className="px-4 py-3 text-right font-bold">
+                                  상담
+                                </th>
+
+                                <th className="px-4 py-3 text-right font-bold">
+                                  수술
+                                </th>
+
+                                <th className="px-4 py-3 text-right font-bold">
+                                  비율
+                                </th>
+                              </tr>
+                            </thead>
+
+                            <tbody>
+                              {rows
+                                .slice()
+                                .sort(
+                                  (a, b) =>
+                                    b.date.localeCompare(
+                                      a.date
+                                    )
+                                )
+                                .map((row) => (
+                                  <tr
+                                    key={row.date}
+                                    className="border-t border-zinc-100"
+                                  >
+                                    <td className="px-4 py-3 font-semibold text-zinc-700">
+                                      {`${Number(
+                                        row.date.slice(5, 7)
+                                      )}/${Number(
+                                        row.date.slice(8, 10)
+                                      )}`}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right font-bold text-zinc-800">
+                                      {row.consultations}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right font-bold text-zinc-800">
+                                      {row.surgeries}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right font-black text-blue-700">
+                                      {row.rate.toFixed(1)}%
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="mt-5 rounded-xl bg-zinc-50 px-5 py-8 text-center text-sm text-zinc-400">
+                          아직 입력된 상담·수술 데이터가 없습니다.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </article>
+            
+
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold">
+                      월별 내원 경로
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 실제 내원 기준
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-zinc-400">
+                      총 내원
+                    </p>
+                    <p className="mt-1 text-2xl font-black text-zinc-950">
+                      {dashboardData.totalVisitSourceCount.toLocaleString()}
+                      <span className="ml-1 text-sm font-semibold text-zinc-400">
+                        명
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {dashboardData.monthlyVisitSources.length > 0 ? (
+                    dashboardData.monthlyVisitSources.map((row) => {
+                      const rate =
+                        dashboardData.totalVisitSourceCount > 0
+                          ? (row.count /
+                              dashboardData.totalVisitSourceCount) *
+                            100
+                          : 0;
+
+                      return (
+                        <div key={row.source}>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                            <span className="font-semibold text-zinc-700">
+                              {row.source}
+                            </span>
+
+                            <span className="whitespace-nowrap text-zinc-500">
+                              <strong className="text-zinc-900">
+                                {row.count.toLocaleString()}명
+                              </strong>
+                              {" · "}
+                              {rate.toFixed(1)}%
+                            </span>
+                          </div>
+
+                          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className="h-full rounded-full bg-blue-600"
+                              style={{
+                                width: `${Math.max(
+                                  rate,
+                                  rate > 0 ? 2 : 0
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+                      등록된 내원 경로 데이터가 없습니다.
+                    </div>
+                  )}
+                </div>
+              </article>
+            </section>
+<section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold">
+                      카테고리별 상담 · 수술
+                    </h2>
+
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 기준 · 코 / 눈 / 리프팅 / 쁘띠
+                    </p>
+                  </div>
+
+                  <a
+                    href="/admin/category-conversion"
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  >
+                    입력하기 →
+                  </a>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {(dashboardData.categoryConversions ?? []).map(
+                    (row) => (
+                      <div
+                        key={row.category}
+                        className="rounded-2xl border border-zinc-100 bg-zinc-50 p-5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-black text-zinc-900">
+                            {row.category}
+                          </h3>
+
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                            {row.rate.toFixed(1)}%
+                          </span>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-2 gap-3">
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-xs font-semibold text-zinc-500">
+                              상담
+                            </p>
+
+                            <p className="mt-1 text-xl font-black text-zinc-900">
+                              {row.consultations.toLocaleString()}
+                              <span className="ml-1 text-xs font-semibold text-zinc-400">
+                                건
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-xs font-semibold text-zinc-500">
+                              수술
+                            </p>
+
+                            <p className="mt-1 text-xl font-black text-zinc-900">
+                              {row.surgeries.toLocaleString()}
+                              <span className="ml-1 text-xs font-semibold text-zinc-400">
+                                건
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <div className="mb-2 flex justify-between text-xs">
+                            <span className="font-semibold text-zinc-500">
+                              상담 대비 수술
+                            </span>
+
+                            <strong className="text-blue-700">
+                              {row.rate.toFixed(1)}%
+                            </strong>
+                          </div>
+
+                          <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+                            <div
+                              className="h-full rounded-full bg-blue-600"
+                              style={{
+                                width: `${Math.min(
+                                  row.rate,
+                                  100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </article>
+            </section>
+            {/* CATEGORY_DAILY_TREND_SECTION */}
+            <section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-black text-zinc-900">
+                      카테고리 일별 추이
+                    </h2>
+
+                    <p className="mt-1 text-sm text-zinc-500">
+                      선택 월 기준 일자별 상담 · 수술 변화
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {["코", "눈", "리프팅", "쁘띠"].map(
+                      (category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() =>
+                            setSelectedCategoryTrend(
+                              category
+                            )
+                          }
+                          className={
+                            selectedCategoryTrend ===
+                            category
+                              ? "rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white"
+                              : "rounded-xl bg-zinc-100 px-4 py-2 text-sm font-bold text-zinc-500 hover:bg-zinc-200"
+                          }
+                        >
+                          {category}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {(() => {
+                  const rows =
+                    (
+                      dashboardData.dailyCategoryConversions ??
+                      []
+                    ).filter(
+                      (row) =>
+                        row.category ===
+                        selectedCategoryTrend
+                    );
+
+                  const consultations =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum +
+                        row.consultations,
+                      0
+                    );
+
+                  const surgeries =
+                    rows.reduce(
+                      (sum, row) =>
+                        sum +
+                        row.surgeries,
+                      0
+                    );
+
+                  const rate =
+                    consultations > 0
+                      ? (surgeries /
+                          consultations) *
+                        100
+                      : 0;
+
+                  return (
+                    <>
+                      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            {selectedCategoryTrend} 상담
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {consultations.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-zinc-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-500">
+                            {selectedCategoryTrend} 수술
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-zinc-900">
+                            {surgeries.toLocaleString()}
+                            <span className="ml-1 text-sm font-semibold text-zinc-400">
+                              건
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-blue-50 px-4 py-4">
+                          <p className="text-xs font-semibold text-blue-600">
+                            상담 대비 수술 비율
+                          </p>
+
+                          <p className="mt-1 text-2xl font-black text-blue-700">
+                            {rate.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <CategoryTrendChart
+                          rows={rows}
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
+              </article>
+            </section>
+
+
+            <section className="mt-6">
+              <PlatformDetailTable
+                current={current}
+                previous={previous}
+              />
+            </section>
+
+            
+<section className="mt-6">
+              <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  플랫폼별 예약 전환율 비교
+                </h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  이번 달 · 전월 · 전년 동월 기준
+                </p>
+
+                <PlatformChart
+                  current={current.platformStats}
+                  previous={previous?.platformStats ?? []}
+                  lastYear={lastYear?.platformStats ?? []}
+                />
+              </article>
+            </section>
+          </>
+        ) : (
+          /* =========================
+             일별 대시보드
+          ========================= */
+
+          <DailyDashboard
+            month={
+              dashboardData.selectedMonth
+            }
+          />
+        )}
+      </div>
+    </main>
+  );
+}
+
+
+
+===== IMPORT PREVIEW =====
+import { NextRequest, NextResponse } from "next/server";
+import * as XLSX from "xlsx";
+
+import { isAdminAuthenticated } from "@/lib/auth/admin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type PlatformRow = {
+  platform: string;
+  applications: number;
+  reservations: number;
+};
+
+type DailyPlatformRow = {
+  date: string;
+  platform: string;
+  applications: number;
+  reservations: number;
+};
+
+type MonthPreview = {
+  month: string;
+  platforms: PlatformRow[];
+  dailyPlatforms: DailyPlatformRow[];
+  consultations: number | null;
+  surgeries: number | null;
+  sources: string[];
+  warnings: string[];
+};
+
+type SheetCandidate = {
+  month: string;
+  monthlyPlatforms: PlatformRow[];
+  monthlyPlatformScore: number;
+  dailyPlatforms: DailyPlatformRow[];
+  consultations: number | null;
+  surgeries: number | null;
+  conversionScore: number;
+  warnings: string[];
+};
+
+type MonthAccumulator = {
+  month: string;
+  platformMap: Map<string, PlatformRow>;
+  platformScore: number;
+  dailyMap: Map<string, DailyPlatformRow>;
+  consultations: number | null;
+  surgeries: number | null;
+  conversionScore: number;
+  sources: Set<string>;
+  warnings: Set<string>;
+};
+
+function compactText(value: unknown) {
+  return String(value ?? "")
+    .replace(/[\r\n\t]/g, " ")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[·ㆍ]/g, "");
+}
+
+function displayText(value: unknown) {
+  return String(value ?? "")
+    .replace(/[\r\n\t]/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizePlatformName(value: unknown) {
+  const raw = displayText(value);
+  const compact = compactText(value).toLowerCase();
+
+  if (!compact) return "";
+
+  const aliases: Record<string, string> = {
+    바비톡: "바비톡",
+    강남언니: "강남언니",
+    네이버: "네이버",
+    플러스친구: "플러스친구",
+    카카오플러스친구: "플러스친구",
+    카카오친구: "플러스친구",
+    플친: "플러스친구",
+    홈페이지: "홈페이지",
+    인콜: "인콜",
+    총인콜: "인콜",
+    cpa: "CPA",
+    cpa광고: "CPA 광고",
+  };
+
+  return aliases[compact] ?? raw.replace(/\s+/g, "");
+}
+
+function isIgnoredPlatformName(value: unknown) {
+  const compact = compactText(value).toLowerCase();
+  return new Set([
+    "",
+    "일자",
+    "날짜",
+    "요일",
+    "예약취소",
+    "일일합계",
+    "합계",
+    "신청",
+    "예약",
+    "전월신청",
+    "당월신청",
+    "전월예약",
+    "당월예약",
+    "cpa광고",
+  ]).has(compact);
+}
+
+function parseMonthFromSheetName(sheetName: string) {
+  const normalized = sheetName.replace(/\s+/g, " ").trim();
+  const match = normalized.match(/(\d{2,4})\D+(\d{1,2})/);
+
+  if (!match) return null;
+
+  let year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (year < 100) year += 2000;
+
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    month < 1 ||
+    month > 12
+  ) {
+    return null;
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function monthKey(value: string) {
+  return String(value).slice(0, 7);
+}
+
+function isValidDateParts(year: number, month: number, day: number) {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return false;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() + 1 === month &&
+    date.getUTCDate() === day
+  );
+}
+
+function toDateString(value: unknown, fallbackMonth: string) {
+  const [fallbackYear, fallbackMonthNumber] = fallbackMonth
+    .slice(0, 7)
+    .split("-")
+    .map(Number);
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = value.getMonth() + 1;
+    const day = value.getDate();
+
+    if (!isValidDateParts(year, month, day)) return null;
+
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+      2,
+      "0"
+    )}`;
+  }
+
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed && isValidDateParts(parsed.y, parsed.m, parsed.d)) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(
+        parsed.d
+      ).padStart(2, "0")}`;
+    }
+  }
+
+  const text = displayText(value);
+  if (!text) return null;
+
+  let match = text.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!isValidDateParts(year, month, day)) return null;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+      2,
+      "0"
+    )}`;
+  }
+
+  match = text.match(/(\d{1,2})[./-](\d{1,2})/);
+  if (match) {
+    const month = Number(match[1]);
+    const day = Number(match[2]);
+    if (!isValidDateParts(fallbackYear, month, day)) return null;
+    return `${fallbackYear}-${String(month).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
+  }
+
+  if (/^\d{1,2}$/.test(text)) {
+    const day = Number(text);
+    if (!isValidDateParts(fallbackYear, fallbackMonthNumber, day)) return null;
+    return `${fallbackYear}-${String(fallbackMonthNumber).padStart(
+      2,
+      "0"
+    )}-${String(day).padStart(2, "0")}`;
+  }
+
+  return null;
+}
+
+function numberValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const cleaned = String(value)
+    .replace(/,/g, "")
+    .replace(/%/g, "")
+    .replace(/[▲▼△▽]/g, "")
+    .trim();
+
+  const result = Number(cleaned);
+  return Number.isFinite(result) ? result : 0;
+}
+
+function intValue(value: unknown) {
+  return Math.max(0, Math.round(numberValue(value)));
+}
+
+function worksheetToRows(worksheet: XLSX.WorkSheet): unknown[][] {
+  return XLSX.utils.sheet_to_json(worksheet, {
+    header: 1,
+    raw: true,
+    defval: null,
+  }) as unknown[][];
+}
+
+function findNearestHeaderValue(
+  rows: unknown[][],
+  startRow: number,
+  column: number,
+  lookback = 4
+) {
+  for (let rowIndex = startRow; rowIndex >= Math.max(0, startRow - lookback); rowIndex--) {
+    const value = rows[rowIndex]?.[column];
+    if (displayText(value)) return value;
+  }
+  return null;
+}
+
+function findDateColumn(
+  rows: unknown[][],
+  platformHeaderIndex: number,
+  subHeaderIndex: number,
+  firstPlatformColumn: number,
+  fallbackMonth: string
+) {
+  for (
+    let rowIndex = Math.max(0, platformHeaderIndex - 3);
+    rowIndex <= subHeaderIndex;
+    rowIndex++
+  ) {
+    const row = rows[rowIndex] ?? [];
+    for (let column = 0; column < row.length; column++) {
+      const compact = compactText(row[column]);
+      if (compact === "일자" || compact === "날짜") return column;
+    }
+  }
+
+  let bestColumn = -1;
+  let bestCount = 0;
+  const maxColumn = Math.max(0, firstPlatformColumn - 1);
+
+  for (let column = 0; column <= maxColumn; column++) {
+    let count = 0;
+    for (
+      let rowIndex = subHeaderIndex + 1;
+      rowIndex < Math.min(rows.length, subHeaderIndex + 45);
+      rowIndex++
+    ) {
+      const date = toDateString(rows[rowIndex]?.[column], fallbackMonth);
+      if (date && monthKey(date) === monthKey(fallbackMonth)) count++;
+    }
+
+    if (count > bestCount) {
+      bestCount = count;
+      bestColumn = column;
+    }
+  }
+
+  return bestCount >= 2 ? bestColumn : -1;
+}
+
+function parseDailyPlatformLayout(rows: unknown[][], month: string) {
+  const warnings: string[] = [];
+
+  let subHeaderIndex = -1;
+  let pairColumns: number[] = [];
+
+  for (let rowIndex = 0; rowIndex < Math.min(rows.length, 80); rowIndex++) {
+    const row = rows[rowIndex] ?? [];
+    const pairs: number[] = [];
+
+    for (let column = 0; column < row.length - 1; column++) {
+      if (
+        compactText(row[column]) === "신청" &&
+        compactText(row[column + 1]) === "예약"
+      ) {
+        pairs.push(column);
+      }
+    }
+
+    if (pairs.length > pairColumns.length) {
+      pairColumns = pairs;
+      subHeaderIndex = rowIndex;
+    }
+  }
+
+  if (subHeaderIndex < 0 || pairColumns.length < 2) {
+    return {
+      platforms: [] as PlatformRow[],
+      dailyPlatforms: [] as DailyPlatformRow[],
+      score: 0,
+      warnings,
+    };
+  }
+
+  let platformHeaderIndex = subHeaderIndex - 1;
+  let bestHeaderScore = -1;
+
+  for (
+    let rowIndex = Math.max(0, subHeaderIndex - 4);
+    rowIndex < subHeaderIndex;
+    rowIndex++
+  ) {
+    let score = 0;
+    for (const column of pairColumns) {
+      const value = rows[rowIndex]?.[column];
+      if (displayText(value) && !isIgnoredPlatformName(value)) score++;
+    }
+
+    if (score > bestHeaderScore) {
+      bestHeaderScore = score;
+      platformHeaderIndex = rowIndex;
+    }
+  }
+
+  const platformColumns: {
+    platform: string;
+    applicationColumn: number;
+    reservationColumn: number;
+  }[] = [];
+
+  for (const column of pairColumns) {
+    const rawName = findNearestHeaderValue(
+      rows,
+      platformHeaderIndex,
+      column,
+      3
+    );
+
+    if (!rawName || isIgnoredPlatformName(rawName)) continue;
+
+    const platform = normalizePlatformName(rawName);
+    if (!platform || isIgnoredPlatformName(platform)) continue;
+
+    if (
+      platformColumns.some(
+        (item) => compactText(item.platform) === compactText(platform)
+      )
+    ) {
+      continue;
+    }
+
+    platformColumns.push({
+      platform,
+      applicationColumn: column,
+      reservationColumn: column + 1,
+    });
+  }
+
+  if (platformColumns.length < 2) {
+    warnings.push("신청/예약 헤더는 찾았지만 플랫폼 열을 충분히 인식하지 못했습니다.");
+    return {
+      platforms: [] as PlatformRow[],
+      dailyPlatforms: [] as DailyPlatformRow[],
+      score: 0,
+      warnings,
+    };
+  }
+
+  const firstPlatformColumn = Math.min(
+    ...platformColumns.map((item) => item.applicationColumn)
+  );
+  const dateColumn = findDateColumn(
+    rows,
+    platformHeaderIndex,
+    subHeaderIndex,
+    firstPlatformColumn,
+    month
+  );
+
+  if (dateColumn < 0) {
+    warnings.push("일별 데이터의 날짜 열을 자동 인식하지 못했습니다.");
+  }
+
+  let totalRowIndex = -1;
+  const searchEnd = Math.min(rows.length, subHeaderIndex + 50);
+
+  for (let rowIndex = subHeaderIndex + 1; rowIndex < searchEnd; rowIndex++) {
+    const row = rows[rowIndex] ?? [];
+    const dateCellText = dateColumn >= 0 ? compactText(row[dateColumn]) : "";
+    const hasTotalText = row.some((cell) => compactText(cell) === "합계");
+
+    if (dateCellText === "합계" || hasTotalText) {
+      const numericPlatformCells = platformColumns.reduce((count, column) => {
+        const a = row[column.applicationColumn];
+        const r = row[column.reservationColumn];
+        return count + (a !== null && a !== undefined ? 1 : 0) + (r !== null && r !== undefined ? 1 : 0);
+      }, 0);
+
+      if (numericPlatformCells >= platformColumns.length) {
+        totalRowIndex = rowIndex;
+        break;
+      }
+    }
+  }
+
+  const dailyPlatforms: DailyPlatformRow[] = [];
+  const dailyEnd = totalRowIndex >= 0 ? totalRowIndex : searchEnd;
+
+  if (dateColumn >= 0) {
+    for (let rowIndex = subHeaderIndex + 1; rowIndex < dailyEnd; rowIndex++) {
+      const row = rows[rowIndex] ?? [];
+      const date = toDateString(row[dateColumn], month);
+      if (!date || monthKey(date) !== monthKey(month)) continue;
+
+      for (const column of platformColumns) {
+        dailyPlatforms.push({
+          date,
+          platform: column.platform,
+          applications: intValue(row[column.applicationColumn]),
+          reservations: intValue(row[column.reservationColumn]),
+        });
+      }
+    }
+  }
+
+  let platforms: PlatformRow[] = [];
+
+  if (totalRowIndex >= 0) {
+    const totalRow = rows[totalRowIndex] ?? [];
+    platforms = platformColumns.map((column) => ({
+      platform: column.platform,
+      applications: intValue(totalRow[column.applicationColumn]),
+      reservations: intValue(totalRow[column.reservationColumn]),
+    }));
+  } else if (dailyPlatforms.length > 0) {
+    const grouped = new Map<string, PlatformRow>();
+
+    for (const row of dailyPlatforms) {
+      const key = compactText(row.platform);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.applications += row.applications;
+        existing.reservations += row.reservations;
+      } else {
+        grouped.set(key, {
+          platform: row.platform,
+          applications: row.applications,
+          reservations: row.reservations,
+        });
+      }
+    }
+
+    platforms = Array.from(grouped.values());
+    warnings.push("합계 행이 없어 일별 데이터를 합산해 월 합계를 만들었습니다.");
+  }
+
+  const score =
+    (totalRowIndex >= 0 ? 1000 : dailyPlatforms.length > 0 ? 800 : 0) +
+    platformColumns.length * 10 +
+    Math.min(dailyPlatforms.length, 300);
+
+  return {
+    platforms,
+    dailyPlatforms,
+    score,
+    warnings,
+  };
+}
+
+function parseComparisonPlatformLayout(rows: unknown[][]) {
+  const platforms = new Map<string, PlatformRow>();
+
+  for (let rowIndex = 1; rowIndex < rows.length - 1; rowIndex++) {
+    const headerRow = rows[rowIndex] ?? [];
+    const valueRow = rows[rowIndex + 1] ?? [];
+
+    for (let column = 0; column < headerRow.length - 4; column++) {
+      const h0 = compactText(headerRow[column]);
+      const h1 = compactText(headerRow[column + 1]);
+      const h3 = compactText(headerRow[column + 3]);
+      const h4 = compactText(headerRow[column + 4]);
+
+      if (
+        h0 !== "전월신청" ||
+        h1 !== "당월신청" ||
+        h3 !== "전월예약" ||
+        h4 !== "당월예약"
+      ) {
+        continue;
+      }
+
+      const rawPlatform = findNearestHeaderValue(rows, rowIndex - 1, column, 3);
+      if (!rawPlatform || isIgnoredPlatformName(rawPlatform)) continue;
+
+      const platform = normalizePlatformName(rawPlatform);
+      if (!platform) continue;
+
+      platforms.set(compactText(platform), {
+        platform,
+        applications: intValue(valueRow[column + 1]),
+        reservations: intValue(valueRow[column + 4]),
+      });
+    }
+  }
+
+  const rowsOut = Array.from(platforms.values());
+  return {
+    platforms: rowsOut,
+    score: rowsOut.length > 0 ? 300 + rowsOut.length * 10 : 0,
+  };
+}
+
+function parseMonthlyConversionLayout(rows: unknown[][]) {
+  let consultations: number | null = null;
+  let surgeries: number | null = null;
+
+  for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex++) {
+    const row = rows[rowIndex] ?? [];
+    const nextRow = rows[rowIndex + 1] ?? [];
+
+    for (let column = 0; column < row.length; column++) {
+      const cell = compactText(row[column]);
+
+      if (
+        cell === "당월상담" ||
+        cell === "당월상담수" ||
+        cell === "당월상담건수"
+      ) {
+        consultations = intValue(nextRow[column]);
+      }
+
+      if (
+        cell === "당월수술전환" ||
+        cell === "당월수술" ||
+        cell === "당월수술전환수"
+      ) {
+        surgeries = intValue(nextRow[column]);
+      }
+    }
+  }
+
+  return {
+    consultations,
+    surgeries,
+    score:
+      consultations !== null || surgeries !== null
+        ? consultations !== null && surgeries !== null
+          ? 1000
+          : 700
+        : 0,
+  };
+}
+
+function parseSheet(
+  worksheet: XLSX.WorkSheet,
+  sheetName: string,
+  fileName: string
+): SheetCandidate | null {
+  const month = parseMonthFromSheetName(sheetName);
+  if (!month) return null;
+
+  const rows = worksheetToRows(worksheet);
+  const warnings: string[] = [];
+
+  const dailyLayout = parseDailyPlatformLayout(rows, month);
+  warnings.push(...dailyLayout.warnings);
+
+  const comparisonLayout = parseComparisonPlatformLayout(rows);
+
+  let monthlyPlatforms = dailyLayout.platforms;
+  let monthlyPlatformScore = dailyLayout.score;
+
+  if (comparisonLayout.score > monthlyPlatformScore) {
+    monthlyPlatforms = comparisonLayout.platforms;
+    monthlyPlatformScore = comparisonLayout.score;
+  } else if (
+    comparisonLayout.platforms.length > 0 &&
+    comparisonLayout.score <= monthlyPlatformScore
+  ) {
+    const existing = new Set(
+      monthlyPlatforms.map((row) => compactText(row.platform))
+    );
+    for (const row of comparisonLayout.platforms) {
+      if (!existing.has(compactText(row.platform))) monthlyPlatforms.push(row);
+    }
+  }
+
+  const conversion = parseMonthlyConversionLayout(rows);
+
+  if (
+    monthlyPlatforms.length === 0 &&
+    dailyLayout.dailyPlatforms.length === 0 &&
+    conversion.score === 0
+  ) {
+    return null;
+  }
+
+  if (dailyLayout.dailyPlatforms.length === 0 && monthlyPlatforms.length > 0) {
+    warnings.push(`${fileName} / ${sheetName}: 월 합계는 인식했지만 일별 원본은 찾지 못했습니다.`);
+  }
+
+  return {
+    month,
+    monthlyPlatforms,
+    monthlyPlatformScore,
+    dailyPlatforms: dailyLayout.dailyPlatforms,
+    consultations: conversion.consultations,
+    surgeries: conversion.surgeries,
+    conversionScore: conversion.score,
+    warnings,
+  };
+}
+
+function getAccumulator(
+  months: Map<string, MonthAccumulator>,
+  month: string
+) {
+  const existing = months.get(month);
+  if (existing) return existing;
+
+  const created: MonthAccumulator = {
+    month,
+    platformMap: new Map(),
+    platformScore: 0,
+    dailyMap: new Map(),
+    consultations: null,
+    surgeries: null,
+    conversionScore: 0,
+    sources: new Set(),
+    warnings: new Set(),
+  };
+
+  months.set(month, created);
+  return created;
+}
+
+function mergeCandidate(
+  accumulator: MonthAccumulator,
+  candidate: SheetCandidate,
+  sourceName: string
+) {
+  accumulator.sources.add(sourceName);
+  for (const warning of candidate.warnings) accumulator.warnings.add(warning);
+
+  if (candidate.monthlyPlatforms.length > 0) {
+    if (candidate.monthlyPlatformScore > accumulator.platformScore) {
+      accumulator.platformMap.clear();
+      for (const row of candidate.monthlyPlatforms) {
+        accumulator.platformMap.set(compactText(row.platform), row);
+      }
+      accumulator.platformScore = candidate.monthlyPlatformScore;
+    } else if (candidate.monthlyPlatformScore === accumulator.platformScore) {
+      for (const row of candidate.monthlyPlatforms) {
+        accumulator.platformMap.set(compactText(row.platform), row);
+      }
+    }
+  }
+
+  for (const row of candidate.dailyPlatforms) {
+    const key = `${row.date}|${compactText(row.platform)}`;
+    const existing = accumulator.dailyMap.get(key);
+
+    if (
+      existing &&
+      (existing.applications !== row.applications ||
+        existing.reservations !== row.reservations)
+    ) {
+      accumulator.warnings.add(
+        `${row.date} ${row.platform} 일별 값이 파일마다 달라 더 나중에 읽은 값을 사용했습니다.`
+      );
+    }
+
+    accumulator.dailyMap.set(key, row);
+  }
+
+  if (candidate.conversionScore > accumulator.conversionScore) {
+    accumulator.consultations = candidate.consultations;
+    accumulator.surgeries = candidate.surgeries;
+    accumulator.conversionScore = candidate.conversionScore;
+  } else if (candidate.conversionScore === accumulator.conversionScore) {
+    if (accumulator.consultations === null && candidate.consultations !== null) {
+      accumulator.consultations = candidate.consultations;
+    }
+    if (accumulator.surgeries === null && candidate.surgeries !== null) {
+      accumulator.surgeries = candidate.surgeries;
+    }
+  }
+}
+
+export async function POST(request: NextRequest) {
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json(
+      { ok: false, message: "관리자 로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const formData = await request.formData();
+    const files = formData.getAll("files");
+
+    if (files.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "엑셀 파일을 선택해주세요." },
+        { status: 400 }
+      );
+    }
+
+    const months = new Map<string, MonthAccumulator>();
+
+    for (const item of files) {
+      if (!(item instanceof File)) continue;
+
+      const buffer = Buffer.from(await item.arrayBuffer());
+      const workbook = XLSX.read(buffer, {
+        type: "buffer",
+        cellDates: true,
+        cellFormula: false,
+      });
+
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) continue;
+
+        const candidate = parseSheet(worksheet, sheetName, item.name);
+        if (!candidate) continue;
+
+        const accumulator = getAccumulator(months, candidate.month);
+        mergeCandidate(accumulator, candidate, `${item.name} / ${sheetName}`);
+      }
+    }
+
+    const preview = Array.from(months.values())
+      .map((item): MonthPreview & {
+        totalApplications: number;
+        totalReservations: number;
+        reservationRate: number;
+        surgeryRate: number | null;
+        dailyRowCount: number;
+      } => {
+        const platforms = Array.from(item.platformMap.values());
+        const dailyPlatforms = Array.from(item.dailyMap.values()).sort((a, b) =>
+          a.date === b.date
+            ? a.platform.localeCompare(b.platform, "ko")
+            : a.date.localeCompare(b.date)
+        );
+
+        const totalApplications = platforms.reduce(
+          (sum, row) => sum + row.applications,
+          0
+        );
+        const totalReservations = platforms.reduce(
+          (sum, row) => sum + row.reservations,
+          0
+        );
+
+        return {
+          month: item.month,
+          platforms,
+          dailyPlatforms,
+          consultations: item.consultations,
+          surgeries: item.surgeries,
+          sources: Array.from(item.sources),
+          warnings: Array.from(item.warnings),
+          totalApplications,
+          totalReservations,
+          reservationRate:
+            totalApplications > 0
+              ? (totalReservations / totalApplications) * 100
+              : 0,
+          surgeryRate:
+            item.consultations !== null &&
+            item.consultations > 0 &&
+            item.surgeries !== null
+              ? (item.surgeries / item.consultations) * 100
+              : null,
+          dailyRowCount: dailyPlatforms.length,
+        };
+      })
+      .sort((a, b) => b.month.localeCompare(a.month));
+
+    return NextResponse.json({
+      ok: true,
+      months: preview,
+    });
+  } catch (error) {
+    console.error("Excel preview error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error
+            ? `엑셀 분석 중 오류: ${error.message}`
+            : "엑셀 분석 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+===== IMPORT COMMIT =====
+import { NextRequest, NextResponse } from "next/server";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+
+import { db } from "@/lib/db";
+import {
+  dailyPlatformStats,
+  monthlyConversionStats,
+  monthlyPlatformStats,
+  platforms,
+} from "@/lib/db/schema";
+import { isAdminAuthenticated } from "@/lib/auth/admin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type ImportMonth = {
+  month: string;
+  platforms?: {
+    platform: string;
+    applications: number;
+    reservations: number;
+  }[];
+  dailyPlatforms?: {
+    date: string;
+    platform: string;
+    applications: number;
+    reservations: number;
+  }[];
+  consultations: number | null;
+  surgeries: number | null;
+};
+
+type ImportBody = {
+  months: ImportMonth[];
+  mode: "overwrite" | "skip";
+};
+
+function compactText(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[·ㆍ]/g, "")
+    .toLowerCase();
+}
+
+function normalizePlatformName(value: unknown) {
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+  const compact = compactText(value);
+
+  const aliases: Record<string, string> = {
+    바비톡: "바비톡",
+    강남언니: "강남언니",
+    네이버: "네이버",
+    플러스친구: "플러스친구",
+    카카오플러스친구: "플러스친구",
+    카카오친구: "플러스친구",
+    플친: "플러스친구",
+    홈페이지: "홈페이지",
+    인콜: "인콜",
+    총인콜: "인콜",
+    cpa: "CPA",
+    cpa광고: "CPA 광고",
+  };
+
+  return aliases[compact] ?? raw.replace(/\s+/g, "");
+}
+
+function safeNumber(value: unknown) {
+  return Math.max(0, Math.round(Number(value) || 0));
+}
+
+function normalizeMonthStart(value: unknown) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+
+function isValidDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() + 1 === month &&
+    date.getUTCDate() === day
+  );
+}
+
+function getNextMonthStart(monthStart: string) {
+  const [yearText, monthText] = monthStart.split("-");
+  const year = Number(yearText);
+  const monthNumber = Number(monthText);
+
+  const next = new Date(Date.UTC(year, monthNumber, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(
+    2,
+    "0"
+  )}-01`;
+}
+
+export async function POST(request: NextRequest) {
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json(
+      { ok: false, message: "관리자 로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = (await request.json()) as ImportBody;
+
+    if (!Array.isArray(body.months) || body.months.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "저장할 데이터가 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    const mode = body.mode === "skip" ? "skip" : "overwrite";
+
+    const platformMasters = await db.select().from(platforms);
+    const platformMap = new Map(
+      platformMasters.map((row) => [compactText(row.name), row])
+    );
+
+    let savedMonths = 0;
+    let skippedMonths = 0;
+    let monthlyRowsSaved = 0;
+    let dailyRowsSaved = 0;
+    let conversionMonthsSaved = 0;
+    let preservedDatasets = 0;
+
+    for (const monthData of body.months) {
+      const monthStart = normalizeMonthStart(monthData.month);
+      if (!monthStart) continue;
+
+      const nextMonthStart = getNextMonthStart(monthStart);
+
+      const monthlyInputMap = new Map<
+        string,
+        { platform: string; applications: number; reservations: number }
+      >();
+
+      for (const row of monthData.platforms ?? []) {
+        const platform = normalizePlatformName(row.platform);
+        const key = compactText(platform);
+        if (!platform || !key) continue;
+
+        monthlyInputMap.set(key, {
+          platform,
+          applications: safeNumber(row.applications),
+          reservations: safeNumber(row.reservations),
+        });
+      }
+
+      const dailyInputMap = new Map<
+        string,
+        {
+          date: string;
+          platform: string;
+          applications: number;
+          reservations: number;
+        }
+      >();
+
+      for (const row of monthData.dailyPlatforms ?? []) {
+        const date = String(row.date ?? "").trim();
+        const platform = normalizePlatformName(row.platform);
+        const platformKey = compactText(platform);
+
+        if (
+          !isValidDate(date) ||
+          date < monthStart ||
+          date >= nextMonthStart ||
+          !platform ||
+          !platformKey
+        ) {
+          continue;
+        }
+
+        dailyInputMap.set(`${date}|${platformKey}`, {
+          date,
+          platform,
+          applications: safeNumber(row.applications),
+          reservations: safeNumber(row.reservations),
+        });
+      }
+
+      const incomingMonthly = Array.from(monthlyInputMap.values());
+      const incomingDaily = Array.from(dailyInputMap.values());
+      const hasIncomingConversion =
+        monthData.consultations !== null || monthData.surgeries !== null;
+
+      const allPlatformNames = Array.from(
+        new Set([
+          ...incomingMonthly.map((row) => row.platform),
+          ...incomingDaily.map((row) => row.platform),
+        ])
+      );
+
+      for (const platformName of allPlatformNames) {
+        const key = compactText(platformName);
+        if (platformMap.has(key)) continue;
+
+        const hideFromChannelChart = key === "인콜" || key === "총인콜";
+
+        const [created] = await db
+          .insert(platforms)
+          .values({
+            name: platformName,
+            sortOrder: platformMap.size + 1,
+            isActive: true,
+            includeInTotal: true,
+            includeInChannelChart: !hideFromChannelChart,
+          })
+          .returning();
+
+        platformMap.set(key, created);
+      }
+
+      const [existingMonthly, existingDaily, existingConversion] =
+        await Promise.all([
+          db
+            .select({ id: monthlyPlatformStats.id })
+            .from(monthlyPlatformStats)
+            .where(eq(monthlyPlatformStats.month, monthStart))
+            .limit(1),
+          db
+            .select({ id: dailyPlatformStats.id })
+            .from(dailyPlatformStats)
+            .where(
+              and(
+                gte(dailyPlatformStats.date, monthStart),
+                lt(dailyPlatformStats.date, nextMonthStart)
+              )
+            )
+            .limit(1),
+          db
+            .select({ id: monthlyConversionStats.id })
+            .from(monthlyConversionStats)
+            .where(eq(monthlyConversionStats.month, monthStart))
+            .limit(1),
+        ]);
+
+      let wroteSomething = false;
+      let skippedSomething = false;
+
+      const shouldWriteMonthly =
+        incomingMonthly.length > 0 &&
+        (mode === "overwrite" || existingMonthly.length === 0);
+
+      if (shouldWriteMonthly) {
+        if (mode === "overwrite") {
+          await db
+            .delete(monthlyPlatformStats)
+            .where(eq(monthlyPlatformStats.month, monthStart));
+        }
+
+        const values = incomingMonthly
+          .map((row) => {
+            const platform = platformMap.get(compactText(row.platform));
+            if (!platform) return null;
+
+            return {
+              month: monthStart,
+              platformId: platform.id,
+              applications: row.applications,
+              reservations: row.reservations,
+            };
+          })
+          .filter(
+            (
+              row
+            ): row is {
+              month: string;
+              platformId: number;
+              applications: number;
+              reservations: number;
+            } => row !== null
+          );
+
+        if (values.length > 0) {
+          await db
+            .insert(monthlyPlatformStats)
+            .values(values)
+            .onConflictDoUpdate({
+              target: [
+                monthlyPlatformStats.month,
+                monthlyPlatformStats.platformId,
+              ],
+              set: {
+                applications: sql`excluded.applications`,
+                reservations: sql`excluded.reservations`,
+                updatedAt: new Date(),
+              },
+            });
+
+          monthlyRowsSaved += values.length;
+          wroteSomething = true;
+        }
+      } else if (incomingMonthly.length > 0) {
+        skippedSomething = true;
+      } else if (existingMonthly.length > 0) {
+        preservedDatasets++;
+      }
+
+      const shouldWriteDaily =
+        incomingDaily.length > 0 &&
+        (mode === "overwrite" || existingDaily.length === 0);
+
+      if (shouldWriteDaily) {
+        if (mode === "overwrite") {
+          await db
+            .delete(dailyPlatformStats)
+            .where(
+              and(
+                gte(dailyPlatformStats.date, monthStart),
+                lt(dailyPlatformStats.date, nextMonthStart)
+              )
+            );
+        }
+
+        const dailyValues = incomingDaily
+          .map((row) => {
+            const platform = platformMap.get(compactText(row.platform));
+            if (!platform) return null;
+
+            return {
+              date: row.date,
+              platformId: platform.id,
+              applications: row.applications,
+              reservations: row.reservations,
+            };
+          })
+          .filter(
+            (
+              row
+            ): row is {
+              date: string;
+              platformId: number;
+              applications: number;
+              reservations: number;
+            } => row !== null
+          );
+
+        const chunkSize = 500;
+        for (let i = 0; i < dailyValues.length; i += chunkSize) {
+          const chunk = dailyValues.slice(i, i + chunkSize);
+          await db
+            .insert(dailyPlatformStats)
+            .values(chunk)
+            .onConflictDoUpdate({
+              target: [dailyPlatformStats.date, dailyPlatformStats.platformId],
+              set: {
+                applications: sql`excluded.applications`,
+                reservations: sql`excluded.reservations`,
+                updatedAt: new Date(),
+              },
+            });
+        }
+
+        dailyRowsSaved += dailyValues.length;
+        wroteSomething = wroteSomething || dailyValues.length > 0;
+      } else if (incomingDaily.length > 0) {
+        skippedSomething = true;
+      } else if (existingDaily.length > 0) {
+        preservedDatasets++;
+      }
+
+      const shouldWriteConversion =
+        hasIncomingConversion &&
+        (mode === "overwrite" || existingConversion.length === 0);
+
+      if (shouldWriteConversion) {
+        const consultations = safeNumber(monthData.consultations);
+        const surgeries = safeNumber(monthData.surgeries);
+
+        await db
+          .insert(monthlyConversionStats)
+          .values({
+            month: monthStart,
+            consultations,
+            surgeries,
+          })
+          .onConflictDoUpdate({
+            target: monthlyConversionStats.month,
+            set: {
+              consultations,
+              surgeries,
+              updatedAt: new Date(),
+            },
+          });
+
+        conversionMonthsSaved++;
+        wroteSomething = true;
+      } else if (hasIncomingConversion) {
+        skippedSomething = true;
+      } else if (existingConversion.length > 0) {
+        preservedDatasets++;
+      }
+
+      if (wroteSomething) savedMonths++;
+      else if (skippedSomething) skippedMonths++;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: "엑셀 데이터를 안전하게 병합 저장했습니다.",
+      savedMonths,
+      skippedMonths,
+      monthlyRowsSaved,
+      dailyRowsSaved,
+      conversionMonthsSaved,
+      preservedDatasets,
+    });
+  } catch (error) {
+    console.error("Excel import commit error:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error
+            ? `엑셀 데이터 저장 중 오류: ${error.message}`
+            : "엑셀 데이터 저장 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}

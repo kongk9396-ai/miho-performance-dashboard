@@ -1,0 +1,104 @@
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m29[m[36m:[m  [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m30[m[36m:[m  [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m39[m[36m:[m  [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m40[m[36m:[m  [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m51[m[36m:[m  [1;31mdailyConversions[m: {
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m53[m[36m:[m    [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m54[m[36m:[m    [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m60[m[36m:[m    [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m61[m[36m:[m    [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m67[m[36m:[m    [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m68[m[36m:[m    [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m75[m[36m:[m    [1;31mconsultations[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m76[m[36m:[m    [1;31msurgeries[m: number;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m312[m[36m:[m        current.[1;31mconsultations[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m314[m[36m:[m        previous?.[1;31mconsultations[m ??
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m317[m[36m:[m        lastYear?.[1;31mconsultations[m ??
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m323[m[36m:[m        current.[1;31msurgeries[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m325[m[36m:[m        previous?.[1;31msurgeries[m ??
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m328[m[36m:[m        lastYear?.[1;31msurgeries[m ??
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1382[m[36m:[m          current.[1;31mconsultations[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1387[m[36m:[m          previous?.[1;31mconsultations[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1392[m[36m:[m          lastYear?.[1;31mconsultations[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1396[m[36m:[m        current.[1;31mconsultations[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1397[m[36m:[m        previous?.[1;31mconsultations[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1401[m[36m:[m        current.[1;31mconsultations[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1402[m[36m:[m        lastYear?.[1;31mconsultations[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1413[m[36m:[m          current.[1;31msurgeries[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1418[m[36m:[m          previous?.[1;31msurgeries[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1423[m[36m:[m          lastYear?.[1;31msurgeries[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1427[m[36m:[m        current.[1;31msurgeries[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1428[m[36m:[m        previous?.[1;31msurgeries[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1432[m[36m:[m        current.[1;31msurgeries[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1433[m[36m:[m        lastYear?.[1;31msurgeries[m
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1779[m[36m:[m                    dashboardData.[1;31mdailyConversions[m ?? [];
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1784[m[36m:[m                        sum + row.[1;31mconsultations[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1791[m[36m:[m                        sum + row.[1;31msurgeries[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1801[m[36m:[m                      : dashboardData.current?.[1;31mconsultations[m ?? 0;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1806[m[36m:[m                      : dashboardData.current?.[1;31msurgeries[m ?? 0;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1920[m[36m:[m                                      {row.[1;31mconsultations[m}
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m1924[m[36m:[m                                      {row.[1;31msurgeries[m}
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2041[m[36m:[m                    dashboardData.[1;31mdailyConversions[m ?? [];
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2043[m[36m:[m                  const [1;31mconsultations[m =
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2047[m[36m:[m                            sum + row.[1;31mconsultations[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2050[m[36m:[m                      : current.[1;31mconsultations[m;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2056[m[36m:[m                            sum + row.[1;31msurgeries[m,
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2059[m[36m:[m                      : current.[1;31msurgeries[m;
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2062[m[36m:[m                    [1;31mconsultations[m > 0
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2064[m[36m:[m                          [1;31mconsultations[m) *
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2077[m[36m:[m                            {[1;31mconsultations[m.toLocaleString()}
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2122[m[36m:[m                                row.[1;31mconsultations[m > 0
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2123[m[36m:[m                                  ? (row.[1;31msurgeries[m /
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2124[m[36m:[m                                      row.[1;31mconsultations[m) *
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2138[m[36m:[m                                    {row.[1;31mconsultations[m.toLocaleString()}
+[35mcomponents/DashboardClient.tsx[m[36m:[m[32m2142[m[36m:[m                                    {row.[1;31msurgeries[m.toLocaleString()}
+[35mlib/db/queries.ts[m[36m:[m[32m14[m[36m:[m  [1;31mdailyConversionStats[m,
+[35mlib/db/queries.ts[m[36m:[m[32m113[m[36m:[m  [1;31mconsultations[m: number;
+[35mlib/db/queries.ts[m[36m:[m[32m114[m[36m:[m  [1;31msurgeries[m: number;
+[35mlib/db/queries.ts[m[36m:[m[32m294[m[36m:[m  const [1;31mconsultations[m =
+[35mlib/db/queries.ts[m[36m:[m[32m295[m[36m:[m    conversion?.[1;31mconsultations[m ??
+[35mlib/db/queries.ts[m[36m:[m[32m298[m[36m:[m  const [1;31msurgeries[m =
+[35mlib/db/queries.ts[m[36m:[m[32m299[m[36m:[m    conversion?.[1;31msurgeries[m ??
+[35mlib/db/queries.ts[m[36m:[m[32m303[m[36m:[m    [1;31mconsultations[m > 0
+[35mlib/db/queries.ts[m[36m:[m[32m304[m[36m:[m      ? ([1;31msurgeries[m /
+[35mlib/db/queries.ts[m[36m:[m[32m305[m[36m:[m          [1;31mconsultations[m) *
+[35mlib/db/queries.ts[m[36m:[m[32m374[m[36m:[m    [1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m375[m[36m:[m    [1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m435[m[36m:[m    [1;31mdailyConversionRows[m,
+[35mlib/db/queries.ts[m[36m:[m[32m563[m[36m:[m          [1;31mconsultations[m:
+[35mlib/db/queries.ts[m[36m:[m[32m564[m[36m:[m            monthlyConversionStats.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m566[m[36m:[m          [1;31msurgeries[m:
+[35mlib/db/queries.ts[m[36m:[m[32m567[m[36m:[m            monthlyConversionStats.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m593[m[36m:[m          date: [1;31mdailyConversionStats[m.date,
+[35mlib/db/queries.ts[m[36m:[m[32m594[m[36m:[m          [1;31mconsultations[m: [1;31mdailyConversionStats[m.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m595[m[36m:[m          [1;31msurgeries[m: [1;31mdailyConversionStats[m.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m597[m[36m:[m        .from([1;31mdailyConversionStats[m)
+[35mlib/db/queries.ts[m[36m:[m[32m600[m[36m:[m            gte([1;31mdailyConversionStats[m.date, queryStartDate),
+[35mlib/db/queries.ts[m[36m:[m[32m601[m[36m:[m            lt([1;31mdailyConversionStats[m.date, queryNextDate)
+[35mlib/db/queries.ts[m[36m:[m[32m605[m[36m:[m          asc([1;31mdailyConversionStats[m.date)
+[35mlib/db/queries.ts[m[36m:[m[32m611[m[36m:[m          [1;31mconsultations[m: dailyCategoryConversionStats.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m612[m[36m:[m          [1;31msurgeries[m: dailyCategoryConversionStats.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m783[m[36m:[m          [1;31mconsultations[m:
+[35mlib/db/queries.ts[m[36m:[m[32m785[m[36m:[m              ?.[1;31mconsultations[m ??
+[35mlib/db/queries.ts[m[36m:[m[32m788[m[36m:[m          [1;31msurgeries[m:
+[35mlib/db/queries.ts[m[36m:[m[32m790[m[36m:[m              ?.[1;31msurgeries[m ??
+[35mlib/db/queries.ts[m[36m:[m[32m896[m[36m:[m  const [1;31mdailyConversions[m =
+[35mlib/db/queries.ts[m[36m:[m[32m897[m[36m:[m    [1;31mdailyConversionRows[m
+[35mlib/db/queries.ts[m[36m:[m[32m904[m[36m:[m        [1;31mconsultations[m: row.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m905[m[36m:[m        [1;31msurgeries[m: row.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m907[m[36m:[m          row.[1;31mconsultations[m > 0
+[35mlib/db/queries.ts[m[36m:[m[32m908[m[36m:[m            ? (row.[1;31msurgeries[m / row.[1;31mconsultations[m) * 100
+[35mlib/db/queries.ts[m[36m:[m[32m937[m[36m:[m        const [1;31mconsultations[m =
+[35mlib/db/queries.ts[m[36m:[m[32m941[m[36m:[m              row.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m945[m[36m:[m        const [1;31msurgeries[m =
+[35mlib/db/queries.ts[m[36m:[m[32m949[m[36m:[m              row.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m954[m[36m:[m          [1;31mconsultations[m > 0
+[35mlib/db/queries.ts[m[36m:[m[32m955[m[36m:[m            ? ([1;31msurgeries[m /
+[35mlib/db/queries.ts[m[36m:[m[32m956[m[36m:[m                [1;31mconsultations[m) *
+[35mlib/db/queries.ts[m[36m:[m[32m962[m[36m:[m          [1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m963[m[36m:[m          [1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m989[m[36m:[m        [1;31mconsultations[m: row.[1;31mconsultations[m,
+[35mlib/db/queries.ts[m[36m:[m[32m990[m[36m:[m        [1;31msurgeries[m: row.[1;31msurgeries[m,
+[35mlib/db/queries.ts[m[36m:[m[32m992[m[36m:[m          row.[1;31mconsultations[m > 0
+[35mlib/db/queries.ts[m[36m:[m[32m993[m[36m:[m            ? (row.[1;31msurgeries[m / row.[1;31mconsultations[m) * 100
+[35mlib/db/queries.ts[m[36m:[m[32m1011[m[36m:[m    [1;31mdailyConversions[m,

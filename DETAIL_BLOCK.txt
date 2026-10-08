@@ -1,0 +1,396 @@
+﻿ 2020:                                 width: `${Math.max(
+ 2021:                                   rate,
+ 2022:                                   rate > 0 ? 2 : 0
+ 2023:                                 )}%`,
+ 2024:                               }}
+ 2025:                             />
+ 2026:                           </div>
+ 2027:                         </div>
+ 2028:                       );
+ 2029:                     })
+ 2030:                   ) : (
+ 2031:                     <div className="flex min-h-[220px] items-center justify-center rounded-xl bg-zinc-50 text-sm text-zinc-400">
+ 2032:                       등록된 내원 경로 데이터가 없습니다.
+ 2033:                     </div>
+ 2034:                   )}
+ 2035:                 </div>
+ 2036:               </article>
+ 2037:             </section>
+ 2038:             <section className="mt-6">
+ 2039:               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+ 2040:                 <div className="flex flex-wrap items-start justify-between gap-4">
+ 2041:                   <div>
+ 2042:                     <h2 className="text-lg font-black text-zinc-900">
+ 2043:                       상담 대비 수술 전환
+ 2044:                     </h2>
+ 2045: 
+ 2046:                     <p className="mt-1 text-sm text-zinc-500">
+ 2047:                       선택 월 기준 · 일별 상담 및 수술결정 집계
+ 2048:                     </p>
+ 2049:                   </div>
+ 2050: 
+ 2051:                   <a
+ 2052:                     href="/admin/import"
+ 2053:                     className="text-xs font-bold text-blue-600 hover:text-blue-700"
+ 2054:                   >
+ 2055:                     엑셀 일괄 업로드 →
+ 2056:                   </a>
+ 2057:                 </div>
+ 2058: 
+ 2059:                 {(() => {
+ 2060:                   const rows =
+ 2061:                     dashboardData.dailyConversions ?? [];
+ 2062: 
+ 2063:                   const consultations =
+ 2064:                     rows.length > 0
+ 2065:                       ? rows.reduce(
+ 2066:                           (sum, row) =>
+ 2067:                             sum + row.consultations,
+ 2068:                           0
+ 2069:                         )
+ 2070:                       : current.consultations;
+ 2071: 
+ 2072:                   const conversions =
+ 2073:                     rows.length > 0
+ 2074:                       ? rows.reduce(
+ 2075:                           (sum, row) =>
+ 2076:                             sum + row.surgeries,
+ 2077:                           0
+ 2078:                         )
+ 2079:                       : current.surgeries;
+ 2080: 
+ 2081:                   const rate =
+ 2082:                     consultations > 0
+ 2083:                       ? (conversions /
+ 2084:                           consultations) *
+ 2085:                         100
+ 2086:                       : 0;
+ 2087: 
+ 2088:                   return (
+ 2089:                     <>
+ 2090:                       <div className="mt-6 grid gap-4 sm:grid-cols-3">
+ 2091:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2092:                           <p className="text-xs font-bold text-zinc-500">
+ 2093:                             상담
+ 2094:                           </p>
+ 2095: 
+ 2096:                           <p className="mt-2 text-3xl font-black text-zinc-900">
+ 2097:                             {consultations.toLocaleString()}
+ 2098:                             <span className="ml-1 text-sm font-semibold text-zinc-400">
+ 2099:                               건
+ 2100:                             </span>
+ 2101:                           </p>
+ 2102:                         </div>
+ 2103: 
+ 2104:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2105:                           <p className="text-xs font-bold text-zinc-500">
+ 2106:                             수술 전환
+ 2107:                           </p>
+ 2108: 
+ 2109:                           <p className="mt-2 text-3xl font-black text-zinc-900">
+ 2110:                             {conversions.toLocaleString()}
+ 2111:                             <span className="ml-1 text-sm font-semibold text-zinc-400">
+ 2112:                               건
+ 2113:                             </span>
+ 2114:                           </p>
+ 2115:                         </div>
+ 2116: 
+ 2117:                         <div className="rounded-2xl bg-blue-50 p-5">
+ 2118:                           <p className="text-xs font-bold text-blue-600">
+ 2119:                             상담 → 수술 전환율
+ 2120:                           </p>
+ 2121: 
+ 2122:                           <p className="mt-2 text-3xl font-black text-blue-700">
+ 2123:                             {rate.toFixed(2)}%
+ 2124:                           </p>
+ 2125:                         </div>
+ 2126:                       </div>
+ 2127: 
+ 2128:                       <div className="mt-6 overflow-x-auto">
+ 2129:                         <table className="w-full min-w-[560px] border-collapse">
+ 2130:                           <thead>
+ 2131:                             <tr className="border-b border-zinc-200 text-left text-xs text-zinc-500">
+ 2132:                               <th className="px-3 py-3">일자</th>
+ 2133:                               <th className="px-3 py-3 text-right">상담</th>
+ 2134:                               <th className="px-3 py-3 text-right">수술 전환</th>
+ 2135:                               <th className="px-3 py-3 text-right">전환율</th>
+ 2136:                             </tr>
+ 2137:                           </thead>
+ 2138: 
+ 2139:                           <tbody>
+ 2140:                             {rows.map((row) => {
+ 2141:                               const rowRate =
+ 2142:                                 row.consultations > 0
+ 2143:                                   ? (row.surgeries /
+ 2144:                                       row.consultations) *
+ 2145:                                     100
+ 2146:                                   : 0;
+ 2147: 
+ 2148:                               return (
+ 2149:                                 <tr
+ 2150:                                   key={row.date}
+ 2151:                                   className="border-b border-zinc-100 text-sm"
+ 2152:                                 >
+ 2153:                                   <td className="px-3 py-3 font-semibold text-zinc-700">
+ 2154:                                     {row.date.slice(5)}
+ 2155:                                   </td>
+ 2156: 
+ 2157:                                   <td className="px-3 py-3 text-right font-bold">
+ 2158:                                     {row.consultations.toLocaleString()}
+ 2159:                                   </td>
+ 2160: 
+ 2161:                                   <td className="px-3 py-3 text-right font-bold">
+ 2162:                                     {row.surgeries.toLocaleString()}
+ 2163:                                   </td>
+ 2164: 
+ 2165:                                   <td className="px-3 py-3 text-right font-black text-blue-600">
+ 2166:                                     {rowRate.toFixed(2)}%
+ 2167:                                   </td>
+ 2168:                                 </tr>
+ 2169:                               );
+ 2170:                             })}
+ 2171:                           </tbody>
+ 2172:                         </table>
+ 2173: 
+ 2174:                         {rows.length === 0 && (
+ 2175:                           <div className="py-10 text-center text-sm text-zinc-400">
+ 2176:                             일별 상담/수술전환 데이터가 없습니다.
+ 2177:                           </div>
+ 2178:                         )}
+ 2179:                       </div>
+ 2180:                     </>
+ 2181:                   );
+ 2182:                 })()}
+ 2183:               </article>
+ 2184:             </section>
+ 2185: 
+ 2186: 
+ 2187: 
+ 2188:             {/* ========================================
+ 2189:                 원장별 수술 전환율
+ 2190:             ======================================== */}
+ 2191: 
+ 2192:             <section className="mt-6">
+ 2193:               <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+ 2194: 
+ 2195:                 <div className="flex flex-wrap items-start justify-between gap-4">
+ 2196: 
+ 2197:                   <div>
+ 2198:                     <h2 className="text-lg font-black text-zinc-900">
+ 2199:                       원장별 수술 전환율
+ 2200:                     </h2>
+ 2201: 
+ 2202:                     <p className="mt-1 text-sm text-zinc-500">
+ 2203:                       상담예약 · 실제 상담 · 수술결정 기준
+ 2204:                     </p>
+ 2205:                   </div>
+ 2206: 
+ 2207:                   <a
+ 2208:                     href="/admin/import"
+ 2209:                     className="text-xs font-bold text-blue-600 hover:text-blue-700"
+ 2210:                   >
+ 2211:                     엑셀 일괄 업로드 →
+ 2212:                   </a>
+ 2213: 
+ 2214:                 </div>
+ 2215: 
+ 2216: 
+ 2217:                 {(() => {
+ 2218: 
+ 2219:                   const rows =
+ 2220:                     dashboardData.doctorConversions ?? [];
+ 2221: 
+ 2222:                   const totalReservations =
+ 2223:                     rows.reduce(
+ 2224:                       (sum, row) =>
+ 2225:                         sum + row.reservations,
+ 2226:                       0
+ 2227:                     );
+ 2228: 
+ 2229:                   const totalConsultations =
+ 2230:                     rows.reduce(
+ 2231:                       (sum, row) =>
+ 2232:                         sum + row.consultations,
+ 2233:                       0
+ 2234:                     );
+ 2235: 
+ 2236:                   const totalSurgeries =
+ 2237:                     rows.reduce(
+ 2238:                       (sum, row) =>
+ 2239:                         sum + row.surgeries,
+ 2240:                       0
+ 2241:                     );
+ 2242: 
+ 2243:                   const totalReservationRate =
+ 2244:                     totalReservations > 0
+ 2245:                       ? (
+ 2246:                           totalSurgeries /
+ 2247:                           totalReservations
+ 2248:                         ) * 100
+ 2249:                       : 0;
+ 2250: 
+ 2251:                   const totalConsultationRate =
+ 2252:                     totalConsultations > 0
+ 2253:                       ? (
+ 2254:                           totalSurgeries /
+ 2255:                           totalConsultations
+ 2256:                         ) * 100
+ 2257:                       : 0;
+ 2258: 
+ 2259: 
+ 2260:                   return (
+ 2261:                     <>
+ 2262: 
+ 2263:                       <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+ 2264: 
+ 2265:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2266:                           <p className="text-xs font-bold text-zinc-500">
+ 2267:                             상담예약
+ 2268:                           </p>
+ 2269: 
+ 2270:                           <p className="mt-2 text-3xl font-black text-zinc-900">
+ 2271:                             {totalReservations.toLocaleString()}
+ 2272:                           </p>
+ 2273:                         </div>
+ 2274: 
+ 2275: 
+ 2276:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2277:                           <p className="text-xs font-bold text-zinc-500">
+ 2278:                             실제 상담
+ 2279:                           </p>
+ 2280: 
+ 2281:                           <p className="mt-2 text-3xl font-black text-zinc-900">
+ 2282:                             {totalConsultations.toLocaleString()}
+ 2283:                           </p>
+ 2284:                         </div>
+ 2285: 
+ 2286: 
+ 2287:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2288:                           <p className="text-xs font-bold text-zinc-500">
+ 2289:                             수술결정
+ 2290:                           </p>
+ 2291: 
+ 2292:                           <p className="mt-2 text-3xl font-black text-zinc-900">
+ 2293:                             {totalSurgeries.toLocaleString()}
+ 2294:                           </p>
+ 2295:                         </div>
+ 2296: 
+ 2297: 
+ 2298:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2299:                           <p className="text-xs font-bold text-zinc-500">
+ 2300:                             예약 → 수술
+ 2301:                           </p>
+ 2302: 
+ 2303:                           <p className="mt-2 text-3xl font-black text-blue-600">
+ 2304:                             {totalReservationRate.toFixed(1)}%
+ 2305:                           </p>
+ 2306:                         </div>
+ 2307: 
+ 2308: 
+ 2309:                         <div className="rounded-2xl bg-zinc-50 p-5">
+ 2310:                           <p className="text-xs font-bold text-zinc-500">
+ 2311:                             상담 → 수술
+ 2312:                           </p>
+ 2313: 
+ 2314:                           <p className="mt-2 text-3xl font-black text-blue-600">
+ 2315:                             {totalConsultationRate.toFixed(1)}%
+ 2316:                           </p>
+ 2317:                         </div>
+ 2318: 
+ 2319:                       </div>
+ 2320: 
+ 2321: 
+ 2322:                       <div className="mt-6 overflow-x-auto">
+ 2323: 
+ 2324:                         <table className="w-full min-w-[760px] text-sm">
+ 2325: 
+ 2326:                           <thead>
+ 2327:                             <tr className="border-b border-zinc-200 text-zinc-500">
+ 2328: 
+ 2329:                               <th className="px-3 py-3 text-left">
+ 2330:                                 원장
+ 2331:                               </th>
+ 2332: 
+ 2333:                               <th className="px-3 py-3 text-right">
+ 2334:                                 상담예약
+ 2335:                               </th>
+ 2336: 
+ 2337:                               <th className="px-3 py-3 text-right">
+ 2338:                                 실제상담
+ 2339:                               </th>
+ 2340: 
+ 2341:                               <th className="px-3 py-3 text-right">
+ 2342:                                 수술결정
+ 2343:                               </th>
+ 2344: 
+ 2345:                               <th className="px-3 py-3 text-right">
+ 2346:                                 예약→수술
+ 2347:                               </th>
+ 2348: 
+ 2349:                               <th className="px-3 py-3 text-right">
+ 2350:                                 상담→수술
+ 2351:                               </th>
+ 2352: 
+ 2353:                             </tr>
+ 2354:                           </thead>
+ 2355: 
+ 2356: 
+ 2357:                           <tbody>
+ 2358: 
+ 2359:                             {rows.map((row) => (
+ 2360: 
+ 2361:                               <tr
+ 2362:                                 key={row.doctorName}
+ 2363:                                 className="border-b border-zinc-100"
+ 2364:                               >
+ 2365: 
+ 2366:                                 <td className="px-3 py-3 font-bold text-zinc-900">
+ 2367:                                   {row.doctorName}
+ 2368:                                 </td>
+ 2369: 
+ 2370:                                 <td className="px-3 py-3 text-right">
+ 2371:                                   {row.reservations.toLocaleString()}
+ 2372:                                 </td>
+ 2373: 
+ 2374:                                 <td className="px-3 py-3 text-right">
+ 2375:                                   {row.consultations.toLocaleString()}
+ 2376:                                 </td>
+ 2377: 
+ 2378:                                 <td className="px-3 py-3 text-right font-bold">
+ 2379:                                   {row.surgeries.toLocaleString()}
+ 2380:                                 </td>
+ 2381: 
+ 2382:                                 <td className="px-3 py-3 text-right">
+ 2383:                                   {row.reservationRate.toFixed(1)}%
+ 2384:                                 </td>
+ 2385: 
+ 2386:                                 <td className="px-3 py-3 text-right font-black text-blue-600">
+ 2387:                                   {row.consultationRate.toFixed(1)}%
+ 2388:                                 </td>
+ 2389: 
+ 2390:                               </tr>
+ 2391: 
+ 2392:                             ))}
+ 2393: 
+ 2394:                           </tbody>
+ 2395: 
+ 2396:                         </table>
+ 2397: 
+ 2398: 
+ 2399:                         {rows.length === 0 && (
+ 2400: 
+ 2401:                           <div className="py-10 text-center text-sm text-zinc-400">
+ 2402:                             원장별 상담/수술 데이터가 없습니다.
+ 2403:                           </div>
+ 2404: 
+ 2405:                         )}
+ 2406: 
+ 2407:                       </div>
+ 2408: 
+ 2409:                     </>
+ 2410:                   );
+ 2411: 
+ 2412:                 })()}
+ 2413: 
+ 2414:               </article>
+ 2415:             </section>
