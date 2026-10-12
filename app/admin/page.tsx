@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Megaphone,
   MessageSquareText,
+  Trash2,
   Settings,
   Users,
 } from "lucide-react";
@@ -45,6 +46,13 @@ const menuGroups = [
           "구글 시트의 일별 상담 대비 수술 전환과 원장님별 수술 전환율을 그대로 붙여넣어 저장합니다.",
         href: "/admin/conversion-paste",
         icon: FileSpreadsheet,
+      },
+      {
+        title: "날짜별 데이터 삭제",
+        description:
+          "잘못 입력된 날짜의 DB보고·전환 데이터를 지우고 월 합계를 다시 계산합니다.",
+        href: "/admin/daily-data",
+        icon: Trash2,
       },
     ],
   },
